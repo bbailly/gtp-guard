@@ -317,6 +317,45 @@ gtp_ie_imsi_rewrite(gtp_apn_t *apn, uint8_t *buffer)
 }
 
 int
+gtp_uli_rewrite(struct sockaddr_in *sgw_addr, gtp_ie_uli_t *uli, pkt_buffer_t *pkt)
+{
+	uint8_t *cp = (uint8_t *) uli;
+	int delta = sizeof(sgw_addr->sin_addr), tail_len;
+
+	/* Move to the end of the IE*/
+    cp += ntohs(uli->h.length) + sizeof(gtp_ie_t);
+	tail_len = pkt->end - cp;
+
+	/* Bounds checking */
+	if (pkt_buffer_tailroom(pkt) < delta) {
+		log_message(LOG_INFO, "%s(): Warning Bounds Check failed pkt_tailroom:%d delta:%d !!!"
+					, __FUNCTION__
+					, pkt_buffer_tailroom(pkt), delta);
+		return 0;
+	}
+	/* Move end of the packet to have space to introduce SGW IPv4 address*/
+	memmove(cp + delta, cp, tail_len);
+
+	/* Write SGW IPv4 address */
+	memcpy((uint8_t *)cp, &sgw_addr->sin_addr.s_addr, delta);
+
+	/* Update IE length, message length and packet length */
+	uli->h.length = uli->h.length + htons(delta);
+	gtp_hdr_t *gtph = (gtp_hdr_t *) pkt->head;
+	gtph->length = gtph->length + htons(delta);
+    pkt->end += delta;
+
+	return 0;
+}
+
+int
+gtp_ie_uli_rewrite(struct sockaddr_in *sgw_addr, gtp_ie_uli_t *ie_uli, pkt_buffer_t *buffer)
+{
+	return gtp_uli_rewrite(sgw_addr, ie_uli, buffer);
+}
+
+
+int
 gtp_apn_extract_ni(char *apn, size_t apn_size, char *buffer, size_t size)
 {
 	char *cp, *end = apn+apn_size;
@@ -439,7 +478,7 @@ gtp_ie_apn_rewrite(gtp_apn_t *apn, gtp_ie_apn_t *ie_apn, size_t offset_ni)
 	memset(apn_oi, 0, 32);
 	gtp_ie_apn_extract_oi(ie_apn, apn_oi, 32);
 
-        list_for_each_entry(rule, l, next) {
+    list_for_each_entry(rule, l, next) {
 		if (strncmp(rule->match, apn_oi, rule->match_len) == 0) {
 			gtp_ie_apn_rewrite_oi(ie_apn, offset_ni, rule->rewrite);
 			return 0;

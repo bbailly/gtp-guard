@@ -652,7 +652,7 @@ DEFUN(show_pppoe,
 	const char *name = NULL;
 
 	if (list_empty(&daemon_data->pppoe)) {
-		vty_out(vty, "%% No PPPoE instance configured...");
+		vty_out(vty, "%% No PPPoE instance configured...%s",VTY_NEWLINE);
 		return CMD_SUCCESS;
 	}
 

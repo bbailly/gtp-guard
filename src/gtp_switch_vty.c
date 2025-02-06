@@ -342,7 +342,7 @@ DEFUN(gtpc_force_pgw_selection,
       "IPv4 Address\n"
       "IPv6 Address\n")
 {
-        gtp_switch_t *ctx = vty->index;
+	gtp_switch_t *ctx = vty->index;
 	struct sockaddr_storage *addr = &ctx->pgw_addr;
 	int ret;
 

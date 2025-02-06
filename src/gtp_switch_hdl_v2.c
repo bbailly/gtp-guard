@@ -328,6 +328,12 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* Update last sGW visited */
 	c->sgw_addr = *((struct sockaddr_in *) addr);
 
+	/* Rewrite ULI by adding SGW */
+	cp = gtp_get_ie(GTP_IE_ULI_TYPE, w->pbuff);
+	if(cp){
+		gtp_ie_uli_rewrite(&c->sgw_addr, (gtp_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+	}
+
 	/* pGW selection */
 	if (__test_bit(GTP_FL_FORCE_PGW_BIT, &ctx->flags)) {
 		teid->pgw_addr = *(struct sockaddr_in *) &ctx->pgw_addr;
