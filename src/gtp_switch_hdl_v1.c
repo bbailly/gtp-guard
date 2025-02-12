@@ -294,6 +294,13 @@ gtp1_create_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 			    , imsi, apn_str, ntohl(teid->id)
 			    , (retransmit) ? " (retransmit)" : "");
 	if (retransmit) {
+		/* Rewrite ULI by adding SGW */
+		cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
+		if(cp){
+			gtpv1_ie_uli_rewrite(&c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+		}else{
+			gtpv1_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+		}
 		gtp_sqn_masq(w, teid);
 		goto end;
 	}
@@ -307,6 +314,14 @@ gtp1_create_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 
 	/* Update last sGW visited */
 	c->sgw_addr = *((struct sockaddr_in *) addr);
+
+	/* Rewrite ULI by adding SGW */
+	cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
+	if(cp){
+		gtpv1_ie_uli_rewrite(&c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+	}else{
+		gtpv1_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+	}
 
 	/* pGW selection */
 	if (__test_bit(GTP_FL_FORCE_PGW_BIT, &ctx->flags)) {
