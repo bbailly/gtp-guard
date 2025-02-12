@@ -256,6 +256,7 @@ gtp1_create_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 				    , __FUNCTION__, apn_str);
 		return NULL;
 	}
+	w->apn = apn_str;
 
 	/* IMSI */
 	cp = gtp1_get_ie(GTP1_IE_IMSI_TYPE, w->pbuff);
@@ -294,12 +295,15 @@ gtp1_create_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 			    , imsi, apn_str, ntohl(teid->id)
 			    , (retransmit) ? " (retransmit)" : "");
 	if (retransmit) {
-		/* Rewrite ULI by adding SGW */
-		cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
-		if(cp){
-			gtpv1_ie_uli_rewrite(&c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
-		}else{
-			gtpv1_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+		/*  if ecgi/cgi override feature activated for the apn */
+		if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
+			/* Rewrite ULI by adding SGW */
+			cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
+			if(cp){
+				gtpv1_ie_uli_rewrite(&c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+			}else{
+				gtpv1_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+			}
 		}
 		gtp_sqn_masq(w, teid);
 		goto end;
@@ -488,6 +492,18 @@ gtp1_update_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 	/* Update GTP-C with current sGW*/
 	gtp_teid_update_sgw(teid, addr);
 	gtp_teid_update_sgw(teid->peer_teid, addr);
+
+	/*  if ecgi/cgi override feature activated for the apn */
+	gtp_apn_t* apn = gtp_apn_get(w->apn);
+	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
+		/* Rewrite ULI by adding SGSN */
+		cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
+		if(cp){
+			gtpv1_ie_uli_rewrite((struct sockaddr_in*)addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+		}else{
+			gtpv1_ie_uli_add((struct sockaddr_in*)addr,(pkt_buffer_t *)w->pbuff);
+		}
+	}
 
 	/* Update SQN */
 	gtp_sqn_update(w, teid);

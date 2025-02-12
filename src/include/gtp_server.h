@@ -31,6 +31,7 @@ typedef struct _gtp_server_worker {
 	struct _gtp_server	*srv;		/* backpointer */
 	pkt_buffer_t		*pbuff;
 	unsigned int		seed;
+	char*			apn;
 
 	/* stats */
 	uint64_t		rx_bytes;

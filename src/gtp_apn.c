@@ -644,7 +644,7 @@ DEFUN(apn_resolv_cache_reload,
 
 	apn = gtp_apn_get(argv[0]);
 	if (!apn) {
-		vty_out(vty, "%% unkown access-point-name %s%s", argv[0], VTY_NEWLINE);
+		vty_out(vty, "%% unknown access-point-name %s%s", argv[0], VTY_NEWLINE);
 		return CMD_WARNING;
 	}
 
@@ -656,6 +656,32 @@ DEFUN(apn_resolv_cache_reload,
 
 	return CMD_SUCCESS;
 }
+
+DEFUN(apn_tag_uli_with_serving_node_ip4,
+      apn_tag_uli_with_serving_node_ip4_cmd,
+      "tag-uli-with-serving-node-ip4",
+      "Override ULI eCGI/CGI to include serving node IPv4 address\n"
+      "access-point-name string")
+{
+	gtp_apn_t *apn = vty->index;
+
+	__set_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
+	return CMD_SUCCESS;
+}
+
+DEFUN(apn_no_tag_uli_with_serving_node_ip4,
+      apn_no_tag_uli_with_serving_node_ip4_cmd,
+      "no tag-uli-with-serving-node-ip4",
+      "Override ULI eCGI/CGI to include serving node IPv4 address\n"
+      "access-point-name string")
+{
+	gtp_apn_t *apn = vty->index;
+
+	__clear_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
+	return CMD_SUCCESS;
+}
+
+
 
 static int
 apn_service_selection_config_write(vty_t *vty, gtp_apn_t *apn)
@@ -1326,6 +1352,10 @@ apn_config_write(vty_t *vty)
 		if (__test_bit(GTP_APN_FL_SESSION_UNIQ_PTYPE, &apn->flags))
 			vty_out(vty, " gtp-session-uniq-pdn-type-per-imsi%s"
 				   , VTY_NEWLINE);
+		if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags))
+			vty_out(vty, " tag-uli-with-serving-node-ip4%s"
+				   , VTY_NEWLINE);
+
 
         	vty_out(vty, "!%s", VTY_NEWLINE);
         }
@@ -1367,6 +1397,10 @@ gtp_apn_vty_init(void)
 	install_element(APN_NODE, &apn_pdn_address_allocation_pool_cmd);
 	install_element(APN_NODE, &apn_ip_vrf_forwarding_cmd);
 	install_element(APN_NODE, &apn_gtp_session_uniq_ptype_cmd);
+	install_element(APN_NODE, &apn_tag_uli_with_serving_node_ip4_cmd);
+	install_element(APN_NODE, &apn_no_tag_uli_with_serving_node_ip4_cmd);
+
+
 
 	/* Install show commands */
 	install_element(VIEW_NODE, &show_apn_cmd);
