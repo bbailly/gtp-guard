@@ -168,9 +168,9 @@ gtp_switch_init(const char *name)
 	gtp_switch_t *new;
 
 	PMALLOC(new);
-        INIT_LIST_HEAD(&new->next);
-        strncpy(new->name, name, GTP_NAME_MAX_LEN - 1);
-        list_add_tail(&new->next, &daemon_data->gtp_switch_ctx);
+	INIT_LIST_HEAD(&new->next);
+	strncpy(new->name, name, GTP_NAME_MAX_LEN - 1);
+	list_add_tail(&new->next, &daemon_data->gtp_switch_ctx);
 
 	/* Init hashtab */
 	gtp_htab_init(&new->gtpc_teid_tab, CONN_HASHTAB_SIZE);

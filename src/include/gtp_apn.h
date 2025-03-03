@@ -29,6 +29,7 @@
 #define GTP_DISPLAY_BUFFER_LEN	512
 #define GTP_DISPLAY_SRV_LEN	256
 #define GTP_MATCH_MAX_LEN	256
+#define GTP_PLMN_LEN	3
 
 /* flags */
 enum gtp_apn_flags {
@@ -96,6 +97,7 @@ typedef struct _gtp_apn {
 	gtp_pco_t		*pco;
 	gtp_ip_pool_t		*ip_pool;
 	ip_vrf_t		*vrf;
+	uint8_t			*hplmn;
 
 	list_head_t		naptr;
 	list_head_t		service_selection;

@@ -700,7 +700,7 @@ gtp_config_write(vty_t *vty)
 			vty_out(vty, "%s", VTY_NEWLINE);
 		}
 		if (__test_bit(GTP_FL_FORCE_PGW_BIT, &ctx->flags))
-			vty_out(vty, " pgw-force-selection %s%s"
+			vty_out(vty, " force-pgw-selection %s%s"
 	                           , inet_sockaddrtos(&ctx->pgw_addr)
         			   , VTY_NEWLINE);
 		if (__test_bit(GTP_FL_IPTNL_BIT, &ctx->flags)) {

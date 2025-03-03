@@ -366,6 +366,7 @@ gtp_apn_alloc(const char *name)
 	INIT_LIST_HEAD(&new->next);
         pthread_mutex_init(&new->mutex, NULL);
 	strlcpy(new->name, name, GTP_APN_MAX_LEN - 1);
+	new->hplmn = NULL;
 
 	/* FIXME: lookup before insert */
 	pthread_mutex_lock(&gtp_apn_mutex);
@@ -656,32 +657,6 @@ DEFUN(apn_resolv_cache_reload,
 
 	return CMD_SUCCESS;
 }
-
-DEFUN(apn_tag_uli_with_serving_node_ip4,
-      apn_tag_uli_with_serving_node_ip4_cmd,
-      "tag-uli-with-serving-node-ip4",
-      "Override ULI eCGI/CGI to include serving node IPv4 address\n"
-      "access-point-name string")
-{
-	gtp_apn_t *apn = vty->index;
-
-	__set_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
-	return CMD_SUCCESS;
-}
-
-DEFUN(apn_no_tag_uli_with_serving_node_ip4,
-      apn_no_tag_uli_with_serving_node_ip4_cmd,
-      "no tag-uli-with-serving-node-ip4",
-      "Override ULI eCGI/CGI to include serving node IPv4 address\n"
-      "access-point-name string")
-{
-	gtp_apn_t *apn = vty->index;
-
-	__clear_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
-	return CMD_SUCCESS;
-}
-
-
 
 static int
 apn_service_selection_config_write(vty_t *vty, gtp_apn_t *apn)
@@ -1229,6 +1204,57 @@ DEFUN(apn_gtp_session_uniq_ptype,
 	return CMD_SUCCESS;
 }
 
+DEFUN(no_apn_gtp_session_uniq_ptype,
+	no_apn_gtp_session_uniq_ptype_cmd,
+	"no gtp-session-uniq-pdn-type-per-imsi",
+	"GTP Session unicity per pdn type and per imsi\n")
+{
+	gtp_apn_t *apn = vty->index;
+
+	__clear_bit(GTP_APN_FL_SESSION_UNIQ_PTYPE, &apn->flags);
+	return CMD_SUCCESS;
+}
+
+DEFUN(apn_tag_uli_with_serving_node_ip4,
+	apn_tag_uli_with_serving_node_ip4_cmd,
+	"tag-uli-with-serving-node-ip4 PLMN",
+	"Overwrite ULI eCGI/CGI to include serving node IPv4 address when VPLMN is not HPLMN\n")
+{
+	gtp_apn_t *apn = vty->index;
+
+	if (argc < 1) {
+		vty_out(vty, "%% missing arguments%s", VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	if(strlen(argv[0]) < GTP_PLMN_LEN * 2 - 1 || strlen(argv[0] )> GTP_PLMN_LEN *2){
+		vty_out(vty, "%% invalid length for HPLMN parameter%s", VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	apn->hplmn = malloc(GTP_PLMN_LEN);
+	if(plmn_string_to_bcd(argv[0],apn->hplmn) != 0){
+		vty_out(vty, "%% can't convert to BCD : %s%s", argv[0], VTY_NEWLINE);
+		return CMD_WARNING;
+
+	}
+	__set_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
+	return CMD_SUCCESS;
+}
+
+DEFUN(no_apn_tag_uli_with_serving_node_ip4,
+	no_apn_tag_uli_with_serving_node_ip4_cmd,
+	"no tag-uli-with-serving-node-ip4",
+	"Overwrite ULI eCGI/CGI to include serving node IPv4 address\n")
+{
+	gtp_apn_t *apn = vty->index;
+
+	__clear_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
+	free(apn->hplmn);
+	apn->hplmn = NULL;
+	return CMD_SUCCESS;
+}
+
+
+
 /* Show */
 DEFUN(show_apn,
       show_apn_cmd,
@@ -1352,10 +1378,13 @@ apn_config_write(vty_t *vty)
 		if (__test_bit(GTP_APN_FL_SESSION_UNIQ_PTYPE, &apn->flags))
 			vty_out(vty, " gtp-session-uniq-pdn-type-per-imsi%s"
 				   , VTY_NEWLINE);
-		if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags))
-			vty_out(vty, " tag-uli-with-serving-node-ip4%s"
+		if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
+			char plmn[6];
+			plmn_bcd_to_string(apn->hplmn, plmn);
+			vty_out(vty, " tag-uli-with-serving-node-ip4 %s%s"
+				   , plmn
 				   , VTY_NEWLINE);
-
+		}
 
         	vty_out(vty, "!%s", VTY_NEWLINE);
         }
@@ -1397,8 +1426,9 @@ gtp_apn_vty_init(void)
 	install_element(APN_NODE, &apn_pdn_address_allocation_pool_cmd);
 	install_element(APN_NODE, &apn_ip_vrf_forwarding_cmd);
 	install_element(APN_NODE, &apn_gtp_session_uniq_ptype_cmd);
+	install_element(APN_NODE, &no_apn_gtp_session_uniq_ptype_cmd);
 	install_element(APN_NODE, &apn_tag_uli_with_serving_node_ip4_cmd);
-	install_element(APN_NODE, &apn_no_tag_uli_with_serving_node_ip4_cmd);
+	install_element(APN_NODE, &no_apn_tag_uli_with_serving_node_ip4_cmd);
 
 
 

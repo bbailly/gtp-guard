@@ -149,6 +149,14 @@ typedef struct _gtp1_ie_imsi {
 	uint8_t		imsi[8];
 } __attribute__((packed)) gtp1_ie_imsi_t;
 
+#define GTP1_IE_RAI_TYPE				3
+typedef struct _gtp1_ie_rai {
+	uint8_t		type;
+	uint8_t		plmn[3];
+	uint16_t	lac;
+	uint8_t		rac;
+} __attribute__((packed)) gtp1_ie_rai_t;
+
 #define GTP1_IE_RECOVERY_TYPE				14
 typedef struct _gtp1_ie_recovery {
 	uint8_t		type;
@@ -382,7 +390,6 @@ typedef struct _gtp_ie_serving_network {
 	uint8_t		mcc_mnc[3];
 } __attribute__((packed)) gtp_ie_serving_network_t;
 
-
 #define GTP_IE_ULI_TYPE			86
 typedef struct _gtp_ie_uli {
 	gtp_ie_t	h;
@@ -396,7 +403,7 @@ typedef struct _gtp_ie_uli {
 	uint8_t		macro_enbid:1;
 	uint8_t		extended_macro_enbid:1;
 #elif __BYTE_ORDER == __BIG_ENDIAN
-	uint8_t		extended_macro_enbid:1;
+ 	uint8_t		extended_macro_enbid:1;
 	uint8_t		macro_enbid:1;
 	uint8_t		lai:1;
 	uint8_t		ecgi:1;
@@ -410,7 +417,7 @@ typedef struct _gtp_ie_uli {
 	/* Grouped identities in following order according
 	* to presence in previous bitfield:
 	CGI / SAI / RAI / TAI / ECGI / LAI / MacroeNBID / extMacroeNBID */
-
+ 
 } __attribute__((packed)) gtp_ie_uli_t;
 
 typedef struct _gtp_id_cgi {
@@ -428,7 +435,8 @@ typedef struct _gtp_id_sai {
 typedef struct _gtp_id_rai {
 	uint8_t		mcc_mnc[3];
 	uint16_t	lac;
-	uint16_t	rac;
+	uint8_t		rac;
+	uint8_t		spare;
 } __attribute__((packed)) gtp_id_rai_t;
 
 typedef struct _gtp_id_tai {
@@ -445,7 +453,7 @@ struct _ecgi{
 				uint32_t	spare:4;
 				uint32_t	enbid:20;
 				uint32_t	cellid:8;
-	#else
+#else
 	# error "Please fix <bits/endian.h>"
 	#endif
 };
@@ -455,7 +463,7 @@ typedef struct _gtp_id_ecgi {
 	union ecgi_u
 	{
 		struct _ecgi ecgi_struct;
-		uint32_t ecgi_value;
+		uint32_t ecgi_raw;
 	} u;
 } __attribute__ ((packed)) gtp_id_ecgi_t;
 

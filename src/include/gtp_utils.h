@@ -32,6 +32,8 @@ extern uint8_t *gtp1_get_ie(uint8_t type, pkt_buffer_t *);
 extern size_t gtp1_ie_add_tail(pkt_buffer_t *, uint16_t);
 
 /* GTPv2 */
+extern int plmn_string_to_bcd(const char*, uint8_t *);
+extern int plmn_bcd_to_string(const uint8_t *, char *);
 extern int bcd_buffer_swap(uint8_t *, int, uint8_t *);
 extern int str_imsi_to_bcd_swap(char *, size_t, uint8_t *);
 extern int64_t bcd_to_int64(const uint8_t *, size_t);

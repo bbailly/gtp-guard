@@ -215,6 +215,7 @@ gtp_session_alloc(gtp_conn_t *c, gtp_apn_t *apn,
 	/* This is a local session id, simply monotonically incremented */
 	__sync_add_and_fetch(&gtp_session_id, 1);
 	new->id = gtp_session_id;
+	new->serving_plmn_isvalid = 0;
 
 	gtp_session_add(c, new);
 	gtp_session_add_timer(new);
