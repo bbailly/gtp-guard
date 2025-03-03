@@ -293,10 +293,10 @@ gtp1_create_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 
 	gtp1_ie_rai_t* rai = (gtp1_ie_rai_t*)gtp1_get_ie(GTP1_IE_RAI_TYPE, w->pbuff);
 	if(rai){
-		memcpy(s->serving_plmn,rai->plmn, sizeof(rai->plmn));
+		memcpy(s->serving_plmn.plmn,rai->plmn, sizeof(rai->plmn));
 		s->serving_plmn_isvalid = 1;
 		char splmn_s[7];
-		plmn_bcd_to_string(s->serving_plmn, splmn_s);
+		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
 		log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
 			, __FUNCTION__
 			, splmn_s);
@@ -335,13 +335,23 @@ gtp1_create_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 
   end:
 	/*  if ecgi/cgi override feature activated for the apn */
-	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags) && s->serving_plmn_isvalid && memcmp(s->serving_plmn, &apn->hplmn, sizeof(s->serving_plmn)) != 0){
-		/* Rewrite ULI by adding SGSN address */
-		cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
-		if(cp){
-			gtpv1_ie_uli_rewrite(&c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
-		}else{
-			gtpv1_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags) && s->serving_plmn_isvalid){
+		gtp_plmn_t* hplmn;
+		uint8_t is_hplmn = 0;
+		list_for_each_entry(hplmn,&apn->hplmn_list,next){
+			if(memcmp(s->serving_plmn.plmn, hplmn->plmn, sizeof(s->serving_plmn.plmn)) == 0){
+				is_hplmn = 1;
+				break;
+			}
+		}
+		if(!is_hplmn){
+			/* Rewrite ULI by adding SGSN address */
+			cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
+			if(cp){
+				gtpv1_ie_uli_rewrite(&c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+			}else{
+				gtpv1_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+			}
 		}
 	}
 
@@ -500,10 +510,10 @@ gtp1_update_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 	/* Update serving PLMN */
 	gtp1_ie_rai_t* rai = (gtp1_ie_rai_t*)gtp1_get_ie(GTP1_IE_RAI_TYPE, w->pbuff);
 	if(rai){
-		memcpy(s->serving_plmn,rai->plmn, sizeof(rai->plmn));
+		memcpy(s->serving_plmn.plmn,rai->plmn, sizeof(rai->plmn));
 		s->serving_plmn_isvalid = 1;
 		char splmn_s[7];
-		plmn_bcd_to_string(s->serving_plmn, splmn_s);
+		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
 		log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
 			, __FUNCTION__
 			, splmn_s);
@@ -512,13 +522,23 @@ gtp1_update_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 
 	/*  if ecgi/cgi override feature activated for the apn */
 	gtp_apn_t* apn = gtp_apn_get(w->apn);
-	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags) && s->serving_plmn_isvalid && memcmp(s->serving_plmn, &apn->hplmn, sizeof(s->serving_plmn)) != 0){
-		/* Rewrite ULI by adding SGSN */
-		cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
-		if(cp){
-			gtpv1_ie_uli_rewrite((struct sockaddr_in*)addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
-		}else{
-			gtpv1_ie_uli_add((struct sockaddr_in*)addr,(pkt_buffer_t *)w->pbuff);
+	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags) && s->serving_plmn_isvalid){
+		gtp_plmn_t* hplmn;
+		uint8_t is_hplmn = 0;
+		list_for_each_entry(hplmn,&apn->hplmn_list,next){
+			if(memcmp(s->serving_plmn.plmn, hplmn->plmn, sizeof(s->serving_plmn.plmn)) == 0){
+				is_hplmn = 1;
+				break;
+			}
+		}
+		if(!is_hplmn){
+			/* Rewrite ULI by adding SGSN */
+			cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
+			if(cp){
+				gtpv1_ie_uli_rewrite((struct sockaddr_in*)addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+			}else{
+				gtpv1_ie_uli_add((struct sockaddr_in*)addr,(pkt_buffer_t *)w->pbuff);
+			}
 		}
 	}
 

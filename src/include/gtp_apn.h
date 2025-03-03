@@ -81,6 +81,12 @@ typedef struct _gtp_rewrite_rule {
 	list_head_t		next;
 } gtp_rewrite_rule_t;
 
+typedef struct _gtp_plmn {
+	uint8_t plmn[3];
+	
+	list_head_t		next;
+} gtp_plmn_t;
+
 /* Access-Point-Name */
 typedef struct _gtp_apn {
 	char			name[GTP_APN_MAX_LEN];
@@ -93,11 +99,11 @@ typedef struct _gtp_apn {
 	int			session_lifetime;
 	uint8_t			eps_bearer_id;
 	uint8_t			restriction;
-	unsigned long		indication_flags;
+	unsigned long	indication_flags;
 	gtp_pco_t		*pco;
-	gtp_ip_pool_t		*ip_pool;
+	gtp_ip_pool_t	*ip_pool;
 	ip_vrf_t		*vrf;
-	uint8_t			*hplmn;
+	list_head_t		hplmn_list;
 
 	list_head_t		naptr;
 	list_head_t		service_selection;

@@ -545,8 +545,7 @@ gtp_naptr_show(vty_t *vty, gtp_apn_t *apn)
 {
 	list_head_t *l = &apn->naptr;
 	gtp_naptr_t *naptr;
-
-	vty_out(vty, "Access-Point-Name %s%s", apn->name, VTY_NEWLINE);
+	vty_out(vty, "NAPTR%s", VTY_NEWLINE);
 	pthread_mutex_lock(&apn->mutex);
 	list_for_each_entry(naptr, l, next) {
 		vty_out(vty, " %s\t(%s, %s, Order:%d, Pref:%d)%s"

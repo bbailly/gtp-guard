@@ -44,7 +44,7 @@ typedef struct _gtp_session {
 	list_head_t		gtpu_teid;
 
 	uint8_t		serving_plmn_isvalid;
-	uint8_t		serving_plmn[GTP_PLMN_LEN];
+	gtp_plmn_t		serving_plmn;
 
 	/* local method */
 	int (*gtpc_teid_destroy) (gtp_teid_t *);
