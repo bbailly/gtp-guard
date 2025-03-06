@@ -348,9 +348,9 @@ gtp1_create_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 			/* Rewrite ULI by adding SGSN address */
 			cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
 			if(cp){
-				gtpv1_ie_uli_rewrite(&c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+				gtpv1_ie_uli_rewrite(apn->override_plmn, &c->sgw_addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
 			}else{
-				gtpv1_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+				gtpv1_ie_uli_add(apn->override_plmn, &c->sgw_addr,(pkt_buffer_t *)w->pbuff);
 			}
 		}
 	}
@@ -535,9 +535,9 @@ gtp1_update_pdp_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *add
 			/* Rewrite ULI by adding SGSN */
 			cp = gtp1_get_ie(GTP1_IE_ULI_TYPE, w->pbuff);
 			if(cp){
-				gtpv1_ie_uli_rewrite((struct sockaddr_in*)addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+				gtpv1_ie_uli_rewrite(apn->override_plmn, (struct sockaddr_in*)addr, (gtp1_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
 			}else{
-				gtpv1_ie_uli_add((struct sockaddr_in*)addr,(pkt_buffer_t *)w->pbuff);
+				gtpv1_ie_uli_add(apn->override_plmn, (struct sockaddr_in*)addr,(pkt_buffer_t *)w->pbuff);
 			}
 		}
 	}

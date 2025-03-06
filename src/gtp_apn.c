@@ -1276,20 +1276,33 @@ DEFUN(no_apn_gtp_session_uniq_ptype,
 
 DEFUN(apn_tag_uli_with_serving_node_ip4,
 	apn_tag_uli_with_serving_node_ip4_cmd,
-	"tag-uli-with-serving-node-ip4 [HPLMN] [HPLMN1]",
+	"tag-uli-with-serving-node-ip4 [PLMN] [HPLMN] [HPLMN] [HPLMN]",
 	"Overwrite ULI eCGI/CGI to include serving node IPv4 address when VPLMN is not HPLMN\n")
 {
 	gtp_apn_t *apn = vty->index;
 
+	if(argc < 1){
+		vty_out(vty, "%% an override PLMN must be defined%s", VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	if(strlen(argv[0]) < GTP_PLMN_LEN * 2 - 1 || strlen(argv[0] )> GTP_PLMN_LEN *2){
+		vty_out(vty, "%% invalid length for override PLMN parameter : %s%s", argv[0], VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	apn->override_plmn = MALLOC(sizeof(gtp_plmn_t));
+	if(plmn_string_to_bcd(argv[0],apn->override_plmn->plmn) != 0){
+		vty_out(vty, "%% can't convert override PLMN parameter to BCD : %s%s", argv[0], VTY_NEWLINE);
+		return CMD_WARNING;
+	}
 	list_del_init(&apn->hplmn_list);
-	for(uint32_t i = 0; i < argc; i++){
+	for(uint32_t i = 1; i < argc; i++){
 		if(strlen(argv[i]) < GTP_PLMN_LEN * 2 - 1 || strlen(argv[i] )> GTP_PLMN_LEN *2){
 			vty_out(vty, "%% invalid length for HPLMN parameter : %s%s", argv[i], VTY_NEWLINE);
 			return CMD_WARNING;
 		}
 		gtp_plmn_t* hplmn = gtp_plmn_alloc(apn,&apn->hplmn_list);
 		if(plmn_string_to_bcd(argv[i],hplmn->plmn) != 0){
-			vty_out(vty, "%% can't convert to BCD : %s%s", argv[i], VTY_NEWLINE);
+			vty_out(vty, "%% can't convert HPLMN to BCD : %s%s", argv[i], VTY_NEWLINE);
 			return CMD_WARNING;
 		}
 	}
@@ -1306,6 +1319,7 @@ DEFUN(no_apn_tag_uli_with_serving_node_ip4,
 
 	__clear_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
 	list_del_init(&apn->hplmn_list);
+	FREE(apn->override_plmn);
 	return CMD_SUCCESS;
 }
 
@@ -1437,24 +1451,30 @@ apn_config_write(vty_t *vty)
 		if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
 			gtp_plmn_t* current_plmn;
 			uint32_t hplmn_list_size = 0;
+			char plmn_s[7];
+			plmn_bcd_to_string(apn->override_plmn->plmn, plmn_s);
+			hplmn_list_size += strlen(plmn_s) + 1;
 			list_for_each_entry(current_plmn, &apn->hplmn_list, next){
 				char plmn_s[7];
 				plmn_bcd_to_string(current_plmn->plmn, plmn_s);
 
 				hplmn_list_size += strlen(plmn_s) + 1;
 			}
-			char* hplmn_list_s = malloc(hplmn_list_size +1);
-			*hplmn_list_s = '\0';
+			char* plmn_list_s = malloc(hplmn_list_size + 1);
+			*plmn_list_s = '\0';
+			plmn_bcd_to_string(apn->override_plmn->plmn, plmn_s);
+			strcat(plmn_list_s," ");
+			strcat(plmn_list_s,plmn_s);
 			list_for_each_entry(current_plmn, &apn->hplmn_list, next){
 				char plmn_s[7];
 				plmn_bcd_to_string(current_plmn->plmn, plmn_s);
-				strcat(hplmn_list_s," ");
-				strcat(hplmn_list_s,plmn_s);
+				strcat(plmn_list_s," ");
+				strcat(plmn_list_s,plmn_s);
 			}
 			vty_out(vty, " tag-uli-with-serving-node-ip4%s%s"
-				   , hplmn_list_s
+				   , plmn_list_s
 				   , VTY_NEWLINE);
-			free(hplmn_list_s);
+			FREE(plmn_list_s);
 		}
 
 		vty_out(vty, "!%s", VTY_NEWLINE);

@@ -139,7 +139,7 @@ gtp1_ie_apn_extract(gtp1_ie_apn_t *apn, char *buffer, size_t size)
 }
 
 int
-gtpv1_uli_rewrite_geographic_location(struct sockaddr_in *sgsn_addr, gtp1_ie_uli_t *uli, pkt_buffer_t *pkt)
+gtpv1_uli_rewrite_geographic_location(gtp_plmn_t* override_plmn, struct sockaddr_in *sgsn_addr, gtp1_ie_uli_t *uli, pkt_buffer_t *pkt)
 {
 	uint8_t *cp = (uint8_t *) uli;
 	int delta = 0;
@@ -148,8 +148,7 @@ gtpv1_uli_rewrite_geographic_location(struct sockaddr_in *sgsn_addr, gtp1_ie_uli
 		, __FUNCTION__);
 
 
-	uint8_t plmn [3]= {0xff,0xff,0xff};
-	memcpy(uli->mcc_mnc, &plmn, sizeof(plmn));
+	memcpy(uli->mcc_mnc, &override_plmn->plmn, sizeof(override_plmn->plmn));
 	uli->geographic_location_type = GTP1_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI;
 	uli->geographic_location.geographic_location_value = ntohl(sgsn_addr->sin_addr.s_addr);
 	log_message(LOG_DEBUG, "%s(): sgw_addr=0x%08x, geographic_location_type=0x%02x, geographic_location_value=0x%08x"
@@ -165,14 +164,14 @@ gtpv1_uli_rewrite_geographic_location(struct sockaddr_in *sgsn_addr, gtp1_ie_uli
 
 
 int
-gtpv1_ie_uli_rewrite(struct sockaddr_in *sgw_addr, gtp1_ie_uli_t *ie_uli, pkt_buffer_t *buffer)
+gtpv1_ie_uli_rewrite(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, gtp1_ie_uli_t *ie_uli, pkt_buffer_t *buffer)
 {
-	return gtpv1_uli_rewrite_geographic_location(sgw_addr, ie_uli,buffer);
+	return gtpv1_uli_rewrite_geographic_location(override_plmn, sgw_addr, ie_uli,buffer);
 }
 
 
 int
-gtpv1_ie_uli_add(struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
+gtpv1_ie_uli_add(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
 {
 	uint8_t *cp;
 	int tail_len;
@@ -208,7 +207,7 @@ gtpv1_ie_uli_add(struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
 	uli.h.type = GTP1_IE_ULI_TYPE;
 	memcpy(cp, &uli, sizeof(gtp1_ie_uli_t));
 
-	return gtpv1_uli_rewrite_geographic_location(sgw_addr, (gtp1_ie_uli_t *)cp,buffer) + delta;
+	return gtpv1_uli_rewrite_geographic_location(override_plmn, sgw_addr, (gtp1_ie_uli_t *)cp,buffer) + delta;
 }
 
 
@@ -220,22 +219,26 @@ int plmn_string_to_bcd(const char* plmn_s, uint8_t * plmn){
 	if(strlen(plmn_s) < 5 || strlen(plmn_s) > 6){
 		return -1;
 	}
-	plmn[0] = (plmn_s[0] - '0') + ((plmn_s[1] - '0') << 4);
+	uint32_t plmn_i = strtol(plmn_s,NULL,16);
+
 	if(strlen(plmn_s) == 5){
-		plmn[1] = (plmn_s[2] - '0') + 0xf0;
-		plmn[2] = (plmn_s[3] - '0') + ((plmn_s[4] - '0') << 4);
+		plmn[0] = ((plmn_i & 0xf0000) >> 16) + ((plmn_i & 0x0f000) >> 8);
+		plmn[1] = ((plmn_i & 0x00f00) >> 8) + 0xf0;
+		plmn[2] = ((plmn_i & 0x000f0) >> 4) + ((plmn_i & 0x0000f) << 4);
 	}else{
-		plmn[1] = (plmn_s[2] - '0') + ((plmn_s[3] - '0') << 4);
-		plmn[2] = (plmn_s[4] - '0') + ((plmn_s[5] - '0') << 4);
+		plmn[0] = ((plmn_i & 0xf00000) >> 20) + ((plmn_i & 0x0f0000) >> 12);
+		plmn[1] = ((plmn_i & 0x00f000) >> 12) + ((plmn_i & 0x000f00) >> 4);
+		plmn[2] = ((plmn_i & 0x0000f0) >> 4) + ((plmn_i & 0x00000f) << 4);
+
 	}
 	return 0;
 }
 
 int plmn_bcd_to_string(const uint8_t * plmn, char * plmn_s){
-	if((plmn[1] & 0xf0) == 0xf0){
-		return sprintf(plmn_s, "%d%d%d%d%d", plmn[0] & 0x0f, (plmn[0] & 0xf0) >> 4, plmn[1] & 0x0f, plmn[2] & 0x0f, (plmn[2] & 0xf0) >> 4);
+	if(!((plmn[0] & 0xf0) > 0x90 || (plmn[0] & 0x0f) > 0x09 || (plmn[1] & 0x0f) > 0x09 || (plmn[2] & 0xf0) > 0x90 || (plmn[2] & 0x0f) > 0x09) && (plmn[1] & 0xf0) == 0xf0){
+		return sprintf(plmn_s, "%x%x%x%x%x", plmn[0] & 0x0f, (plmn[0] & 0xf0) >> 4, plmn[1] & 0x0f, plmn[2] & 0x0f, (plmn[2] & 0xf0) >> 4);
 	}
-	return sprintf(plmn_s, "%d%d%d%d%d%d", plmn[0] & 0x0f, (plmn[0] & 0xf0) >> 4, plmn[1] & 0x0f, (plmn[1] & 0xf0) >> 4, plmn[2] & 0x0f, (plmn[2] & 0xf0) >> 4);
+	return sprintf(plmn_s, "%x%x%x%x%x%x", plmn[0] & 0x0f, (plmn[0] & 0xf0) >> 4, plmn[1] & 0x0f, (plmn[1] & 0xf0) >> 4, plmn[2] & 0x0f, (plmn[2] & 0xf0) >> 4);
 }
 
 int
@@ -413,7 +416,7 @@ gtp_ie_imsi_rewrite(gtp_apn_t *apn, uint8_t *buffer)
 }
 
 int
-gtpv2_uli_rewrite_ecgi(struct sockaddr_in *sgw_addr, gtp_ie_uli_t *uli, pkt_buffer_t *pkt)
+gtpv2_uli_rewrite_ecgi(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, gtp_ie_uli_t *uli, pkt_buffer_t *pkt)
 {
 	uint8_t *cp = (uint8_t *) uli;
 	int delta = 0, tail_len;
@@ -459,7 +462,8 @@ gtpv2_uli_rewrite_ecgi(struct sockaddr_in *sgw_addr, gtp_ie_uli_t *uli, pkt_buff
 		, __FUNCTION__);
 
 
-	gtp_id_ecgi_t ecgi = {mcc_mnc : {0xff,0xff,0xff}};
+	gtp_id_ecgi_t ecgi;
+	memcpy(&ecgi.mcc_mnc, override_plmn->plmn,sizeof(ecgi.mcc_mnc));
 	ecgi.u.ecgi_raw = ntohl(sgw_addr->sin_addr.s_addr);
 	log_message(LOG_DEBUG, "%s(): sgw_addr=0x%08x, spare=0x%01x, enbid=0x%05x, cellid=0x%02x"
 		, __FUNCTION__
@@ -475,14 +479,14 @@ gtpv2_uli_rewrite_ecgi(struct sockaddr_in *sgw_addr, gtp_ie_uli_t *uli, pkt_buff
 
 
 int
-gtpv2_ie_uli_rewrite(struct sockaddr_in *sgw_addr, gtp_ie_uli_t *ie_uli, pkt_buffer_t *buffer)
+gtpv2_ie_uli_rewrite(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, gtp_ie_uli_t *ie_uli, pkt_buffer_t *buffer)
 {
-	return gtpv2_uli_rewrite_ecgi(sgw_addr, ie_uli, buffer);
+	return gtpv2_uli_rewrite_ecgi(override_plmn, sgw_addr, ie_uli, buffer);
 }
 
 
 int
-gtpv2_ie_uli_add(struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
+gtpv2_ie_uli_add(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
 {
 	uint8_t *cp;
 	int tail_len;
@@ -530,7 +534,7 @@ gtpv2_ie_uli_add(struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
 	uli.tai = 0;
 	memcpy(cp, &uli, sizeof(gtp_ie_uli_t));
 
-	return gtpv2_uli_rewrite_ecgi(sgw_addr, (gtp_ie_uli_t *)cp,buffer) + delta;
+	return gtpv2_uli_rewrite_ecgi(override_plmn, sgw_addr, (gtp_ie_uli_t *)cp,buffer) + delta;
 }
 
 int

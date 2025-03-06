@@ -379,6 +379,8 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
   end:
 	/*  if ecgi/cgi override feature activated for the apn */
 	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags) && s->serving_plmn_isvalid){
+		log_message(LOG_DEBUG, "%s(): current serving plmn is defined and GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4 is set"
+			, __FUNCTION__);
 		gtp_plmn_t* hplmn;
 		uint8_t is_hplmn = 0;
 		list_for_each_entry(hplmn,&apn->hplmn_list,next){
@@ -391,9 +393,9 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 			/* Rewrite ULI by adding SGW */
 			cp = gtp_get_ie(GTP_IE_ULI_TYPE, w->pbuff);
 			if(cp){
-				gtpv2_ie_uli_rewrite(&c->sgw_addr, (gtp_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+				gtpv2_ie_uli_rewrite(apn->override_plmn, &c->sgw_addr, (gtp_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
 			}else{
-				gtpv2_ie_uli_add(&c->sgw_addr,(pkt_buffer_t *)w->pbuff);
+				gtpv2_ie_uli_add(apn->override_plmn, &c->sgw_addr,(pkt_buffer_t *)w->pbuff);
 			}
 		}
 	}
@@ -692,9 +694,9 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 			if(!is_hplmn){
 				cp = gtp_get_ie(GTP_IE_ULI_TYPE, w->pbuff);
 				if(cp){
-					gtpv2_ie_uli_rewrite((struct sockaddr_in*) addr, (gtp_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
+					gtpv2_ie_uli_rewrite(apn->override_plmn, (struct sockaddr_in*) addr, (gtp_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
 				}else{
-					gtpv2_ie_uli_add((struct sockaddr_in*) addr,(pkt_buffer_t *)w->pbuff);
+					gtpv2_ie_uli_add(apn->override_plmn, (struct sockaddr_in*) addr,(pkt_buffer_t *)w->pbuff);
 				}
 			}
 		}

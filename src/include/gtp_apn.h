@@ -83,7 +83,7 @@ typedef struct _gtp_rewrite_rule {
 
 typedef struct _gtp_plmn {
 	uint8_t plmn[3];
-	
+
 	list_head_t		next;
 } gtp_plmn_t;
 
@@ -103,6 +103,7 @@ typedef struct _gtp_apn {
 	gtp_pco_t		*pco;
 	gtp_ip_pool_t	*ip_pool;
 	ip_vrf_t		*vrf;
+	gtp_plmn_t		*override_plmn;
 	list_head_t		hplmn_list;
 
 	list_head_t		naptr;
