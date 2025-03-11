@@ -40,6 +40,13 @@ enum gtp_flags {
 	GTP_FL_GTPU_EGRESS_BIT,
 };
 
+/* Roaming Status */
+typedef enum gtp_roaming_status {
+	GTP_ROAMING_STATUS_HPLMN,
+	GTP_ROAMING_STATUS_ROAMING_IN,
+	GTP_ROAMING_STATUS_ROAMING_OUT,
+}  gtp_roaming_status_t;
+
 /* default values */
 #define GTP_MAX_PACKET_SIZE		4096
 #define GTPV1C_HEADER_LEN_SHORT		8

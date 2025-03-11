@@ -64,6 +64,9 @@ extern uint8_t *gtp_get_ie(uint8_t, pkt_buffer_t *);
 extern int gtp_foreach_ie(uint8_t, uint8_t *, size_t, uint8_t *,
 			  gtp_server_worker_t *, gtp_session_t *, int, void *,
 			  gtp_teid_t * (*hdl) (gtp_server_worker_t *, gtp_session_t *, int, void *, uint8_t *));
+extern const char* gtp_get_roaming_status_by_name(gtp_roaming_status_t);
+extern gtp_roaming_status_t gtp_get_roaming_status(uint8_t *, uint8_t *, list_head_t *);
+
 extern ssize_t gtpu_get_header_len(pkt_buffer_t *);
 
 #endif

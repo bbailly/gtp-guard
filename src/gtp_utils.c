@@ -734,7 +734,7 @@ gtp_dump_ie(uint8_t *buffer, size_t size)
 	for (cp = buffer+offset; cp < end; cp += offset) {
 		ie = (gtp_ie_t *) cp;
 		printf(" * IE Type : %d (offset=%ld)\n", ie->type, offset);
-		offset = sizeof(gtp_ie_t) + ntohs(ie->length); 
+		offset = sizeof(gtp_ie_t) + ntohs(ie->length);
 	}
 
 	return 0;
@@ -751,7 +751,7 @@ gtp_get_ie_offset(uint8_t type, uint8_t *buffer, size_t size, size_t off)
 		ie = (gtp_ie_t *) cp;
 		if (ie->type == type)
 			return cp;
-		offset = sizeof(gtp_ie_t) + ntohs(ie->length); 
+		offset = sizeof(gtp_ie_t) + ntohs(ie->length);
 	}
 
 	return NULL;
@@ -782,12 +782,66 @@ gtp_foreach_ie(uint8_t type, uint8_t *buffer, size_t buffer_offset, uint8_t *buf
 			(*hdl) (w, s, direction, arg, cp);
 		}
 
-		offset = sizeof(gtp_ie_t) + ntohs(ie->length); 
+		offset = sizeof(gtp_ie_t) + ntohs(ie->length);
 	}
 
 	return 0;
 }
 
+const char* gtp_get_roaming_status_by_name(const gtp_roaming_status_t roaming_status){
+	switch (roaming_status){
+		case GTP_ROAMING_STATUS_HPLMN: return "HPLMN";
+		case GTP_ROAMING_STATUS_ROAMING_IN: return "RIN";
+		case GTP_ROAMING_STATUS_ROAMING_OUT: return "ROUT";
+		default : return "Undefined";
+	}
+}
+
+gtp_roaming_status_t gtp_get_roaming_status(uint8_t *imsi, uint8_t *serving_plmn, list_head_t *hplmn_list){
+	/* if serving PLMN MNC is 2 digits long */
+	if((serving_plmn[1] & 0xf0) == 0xf0){
+		/* if the serving PLMN matches the IMSI PLMN */
+		if(serving_plmn[0] == imsi[0] && (serving_plmn[1] & 0x0f) == (imsi[1] & 0x0f) && ((serving_plmn[2] & 0xf0) >> 4) == (imsi[2] & 0x0f) && (serving_plmn[2] & 0x0f) == ((imsi[1] & 0xf0) >> 4)){
+			return GTP_ROAMING_STATUS_HPLMN;
+		}
+		gtp_plmn_t *hplmn;
+		list_for_each_entry(hplmn,hplmn_list,next){
+			/* if hplmn PLMN MNC is 2 digits long */
+			if((hplmn->plmn[1] & 0xf0) == 0xf0){
+				/* if the hplmn matches the IMSI PLMN */
+				if(hplmn->plmn[0] == imsi[0] && (hplmn->plmn[1] & 0x0f) == (imsi[1] & 0x0f) && ((hplmn->plmn[2] & 0xf0) >> 4) == (imsi[2] & 0x0f) && (hplmn->plmn[2] & 0x0f) == ((imsi[1] & 0xf0) >> 4)){
+					return GTP_ROAMING_STATUS_ROAMING_OUT;
+				}
+			}else{
+				/* if the hplmn matches the IMSI PLMN */
+				if(memcmp(hplmn->plmn, imsi, sizeof(hplmn->plmn))){
+					return GTP_ROAMING_STATUS_ROAMING_OUT;
+				}
+			}
+		}
+		return GTP_ROAMING_STATUS_ROAMING_IN;
+	}
+	/* if the serving PLMN matches the IMSI PLMN */
+	if(memcmp(serving_plmn, imsi, GTP_PLMN_LEN)){
+		return GTP_ROAMING_STATUS_HPLMN;
+	}
+	gtp_plmn_t *hplmn;
+	list_for_each_entry(hplmn,hplmn_list,next){
+		/* if hplmn PLMN MNC is 2 digits long */
+		if((hplmn->plmn[1] & 0xf0) == 0xf0){
+			/* if the hplmn matches the IMSI PLMN */
+			if(hplmn->plmn[0] == imsi[0] && (hplmn->plmn[1] & 0x0f) == (imsi[1] & 0x0f) && ((hplmn->plmn[2] & 0xf0) >> 4) == (imsi[2] & 0x0f) && (hplmn->plmn[2] & 0x0f) == ((imsi[1] & 0xf0) >> 4)){
+				return GTP_ROAMING_STATUS_ROAMING_OUT;
+			}
+		}else{
+			/* if the hplmn matches the IMSI PLMN */
+			if(memcmp(hplmn->plmn, imsi, sizeof(hplmn->plmn))){
+				return GTP_ROAMING_STATUS_ROAMING_OUT;
+			}
+		}
+	}
+	return GTP_ROAMING_STATUS_ROAMING_IN;
+}
 
 /*
  *      GTP-U related

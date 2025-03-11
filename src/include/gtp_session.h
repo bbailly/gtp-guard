@@ -37,13 +37,14 @@ typedef struct _gtp_session {
 	uint32_t		ipv4;
 	uint64_t		mei;
 	uint64_t		msisdn;
+	/* original imsi */
+	uint8_t			*imsi;
 	uint8_t			ptype;
 
 	gtp_apn_t		*apn;
 	list_head_t		gtpc_teid;
 	list_head_t		gtpu_teid;
 
-	uint8_t		serving_plmn_isvalid;
 	gtp_plmn_t		serving_plmn;
 
 	/* local method */

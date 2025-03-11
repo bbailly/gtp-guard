@@ -215,7 +215,6 @@ gtp_session_alloc(gtp_conn_t *c, gtp_apn_t *apn,
 	/* This is a local session id, simply monotonically incremented */
 	__sync_add_and_fetch(&gtp_session_id, 1);
 	new->id = gtp_session_id;
-	new->serving_plmn_isvalid = 0;
 
 	gtp_session_add(c, new);
 	gtp_session_add_timer(new);
@@ -341,6 +340,9 @@ __gtp_session_destroy(gtp_session_t *s)
 
 	/* Release PPPoE related */
 	__spppoe_destroy(s->s_pppoe);
+
+	/* Release IMSI buffer */
+	FREE(s->imsi);
 
 	/* Release session */
 	list_head_del(&s->next);

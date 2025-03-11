@@ -393,6 +393,7 @@ gtp_apn_alloc(const char *name)
 	PMALLOC(new);
 	INIT_LIST_HEAD(&new->naptr);
 	INIT_LIST_HEAD(&new->service_selection);
+	gtp_service_alloc(new,"",INT_MAX);
 	INIT_LIST_HEAD(&new->imsi_match);
 	INIT_LIST_HEAD(&new->oi_match);
 	INIT_LIST_HEAD(&new->hplmn_list);
@@ -723,13 +724,15 @@ apn_service_selection_config_write(vty_t *vty, gtp_apn_t *apn)
 	gtp_service_t *service;
 
 	list_for_each_entry(service, &apn->service_selection, next) {
+		if (!strcmp(service->str,""))
+			continue;
 		if (service->prio)
-			vty_out(vty, " service-selection %s prio %d%s"
+			vty_out(vty, " service-selection resolution-service %s prio %d%s"
 				   , service->str
 				   , service->prio
 				   , VTY_NEWLINE);
 		else
-			vty_out(vty, " service-selection %s%s"
+			vty_out(vty, " service-selection resolution-service %s%s"
 				   , service->str
 				   , VTY_NEWLINE);
 	}
@@ -739,7 +742,7 @@ apn_service_selection_config_write(vty_t *vty, gtp_apn_t *apn)
 
 DEFUN(apn_service_selection,
       apn_service_selection_cmd,
-      "service-selection STRING prio INTEGER",
+      "service-selection resolution-service STRING prio INTEGER",
       "Force service selection\n"
       "service\n"
       "priority\n")
@@ -1274,9 +1277,97 @@ DEFUN(no_apn_gtp_session_uniq_ptype,
 	return CMD_SUCCESS;
 }
 
+DEFUN(apn_hplmn,
+	apn_hplmn_cmd,
+	"hplmn HPLMN",
+	"defined HPLMN for this APN\n")
+{
+	gtp_apn_t *apn = vty->index;
+
+	if(argc < 1){
+		vty_out(vty, "%% one HPLMN must be present%s", VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	for(uint32_t i = 0; i < argc; i++){
+		if(strlen(argv[i]) < GTP_PLMN_LEN * 2 - 1 || strlen(argv[i] )> GTP_PLMN_LEN *2){
+			vty_out(vty, "%% invalid length for HPLMN parameter : %s%s", argv[i], VTY_NEWLINE);
+			return CMD_WARNING;
+		}
+
+		gtp_plmn_t* hplmn;
+		list_for_each_entry(hplmn,&apn->hplmn_list,next){
+			char plmn_s[7];
+			plmn_bcd_to_string(hplmn->plmn, plmn_s);
+			if(!strcmp(plmn_s,argv[i])){
+				vty_out(vty, "%% HPLMN is already configured : %s%s", argv[i], VTY_NEWLINE);
+				return CMD_WARNING;
+			}
+		}
+
+		hplmn = gtp_plmn_alloc(apn,&apn->hplmn_list);
+		if(plmn_string_to_bcd(argv[i],hplmn->plmn) != 0){
+			list_del_init(&hplmn->next);
+			free(hplmn);
+			vty_out(vty, "%% can't convert HPLMN to BCD : %s%s", argv[i], VTY_NEWLINE);
+			return CMD_WARNING;
+		}
+	}
+	__set_bit(GTP_APN_HPLMN, &apn->flags);
+	return CMD_SUCCESS;
+}
+
+DEFUN(no_apn_hplmn,
+	no_apn_hplmn_cmd,
+	"no hplmn PLMN",
+	"remove defined HPLMN(s)\n")
+{
+	gtp_apn_t *apn = vty->index;
+
+	if(argc < 1){
+		vty_out(vty, "%% one HPLMN must be present%s", VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+
+	if(list_empty(&apn->hplmn_list)){
+		vty_out(vty, "%% no HPLMN currently defined%s", VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	/* if last HPLMN */
+	if(list_first_entry(&apn->hplmn_list, gtp_plmn_t, next) == list_last_entry(&apn->hplmn_list, gtp_plmn_t, next)){
+		if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
+			vty_out(vty, "%% tag-uli-with-serving-node-ip4 must be deleted before removing the last HPLMN%s", VTY_NEWLINE);
+			return CMD_WARNING;
+		}
+	}
+	gtp_plmn_t* hplmn;
+	gtp_plmn_t* tmp;
+	int find = 0;
+
+	list_for_each_entry_safe(hplmn,tmp,&apn->hplmn_list,next){
+		char plmn_s[7];
+		plmn_bcd_to_string(hplmn->plmn, plmn_s);
+		if(!strcmp(plmn_s,argv[0])){
+			list_del_init(&hplmn->next);
+			find = 1;
+			FREE(hplmn);
+			break;
+		}
+	}
+	if(!find){
+		vty_out(vty, "%% HPLMN %s is not configured%s", argv[0], VTY_NEWLINE);
+		return CMD_WARNING;
+	}
+	if(list_empty(&apn->hplmn_list)){
+		__clear_bit(GTP_APN_HPLMN, &apn->flags);
+	}
+
+	return CMD_SUCCESS;
+}
+
+
 DEFUN(apn_tag_uli_with_serving_node_ip4,
 	apn_tag_uli_with_serving_node_ip4_cmd,
-	"tag-uli-with-serving-node-ip4 [PLMN] [HPLMN] [HPLMN] [HPLMN]",
+	"tag-uli-with-serving-node-ip4 PLMN",
 	"Overwrite ULI eCGI/CGI to include serving node IPv4 address when VPLMN is not HPLMN\n")
 {
 	gtp_apn_t *apn = vty->index;
@@ -1294,17 +1385,9 @@ DEFUN(apn_tag_uli_with_serving_node_ip4,
 		vty_out(vty, "%% can't convert override PLMN parameter to BCD : %s%s", argv[0], VTY_NEWLINE);
 		return CMD_WARNING;
 	}
-	list_del_init(&apn->hplmn_list);
-	for(uint32_t i = 1; i < argc; i++){
-		if(strlen(argv[i]) < GTP_PLMN_LEN * 2 - 1 || strlen(argv[i] )> GTP_PLMN_LEN *2){
-			vty_out(vty, "%% invalid length for HPLMN parameter : %s%s", argv[i], VTY_NEWLINE);
-			return CMD_WARNING;
-		}
-		gtp_plmn_t* hplmn = gtp_plmn_alloc(apn,&apn->hplmn_list);
-		if(plmn_string_to_bcd(argv[i],hplmn->plmn) != 0){
-			vty_out(vty, "%% can't convert HPLMN to BCD : %s%s", argv[i], VTY_NEWLINE);
-			return CMD_WARNING;
-		}
+	if(!__test_bit(GTP_APN_HPLMN, &apn->flags)){
+		vty_out(vty, "%% at least one HPLMN must be defined%s", VTY_NEWLINE);
+		return CMD_WARNING;
 	}
 	__set_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
 	return CMD_SUCCESS;
@@ -1318,12 +1401,9 @@ DEFUN(no_apn_tag_uli_with_serving_node_ip4,
 	gtp_apn_t *apn = vty->index;
 
 	__clear_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags);
-	list_del_init(&apn->hplmn_list);
 	FREE(apn->override_plmn);
 	return CMD_SUCCESS;
 }
-
-
 
 /* Show */
 DEFUN(show_apn,
@@ -1448,33 +1528,22 @@ apn_config_write(vty_t *vty)
 		if (__test_bit(GTP_APN_FL_SESSION_UNIQ_PTYPE, &apn->flags))
 			vty_out(vty, " gtp-session-uniq-pdn-type-per-imsi%s"
 				   , VTY_NEWLINE);
-		if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
+		if (__test_bit(GTP_APN_HPLMN, &apn->flags)){
 			gtp_plmn_t* current_plmn;
-			uint32_t hplmn_list_size = 0;
+			list_for_each_entry(current_plmn, &apn->hplmn_list, next){
+				char plmn_s[7];
+				plmn_bcd_to_string(current_plmn->plmn, plmn_s);
+				vty_out(vty, " hplmn %s%s"
+					, plmn_s
+					, VTY_NEWLINE); 
+			}
+		}
+		if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
 			char plmn_s[7];
 			plmn_bcd_to_string(apn->override_plmn->plmn, plmn_s);
-			hplmn_list_size += strlen(plmn_s) + 1;
-			list_for_each_entry(current_plmn, &apn->hplmn_list, next){
-				char plmn_s[7];
-				plmn_bcd_to_string(current_plmn->plmn, plmn_s);
-
-				hplmn_list_size += strlen(plmn_s) + 1;
-			}
-			char* plmn_list_s = malloc(hplmn_list_size + 1);
-			*plmn_list_s = '\0';
-			plmn_bcd_to_string(apn->override_plmn->plmn, plmn_s);
-			strcat(plmn_list_s," ");
-			strcat(plmn_list_s,plmn_s);
-			list_for_each_entry(current_plmn, &apn->hplmn_list, next){
-				char plmn_s[7];
-				plmn_bcd_to_string(current_plmn->plmn, plmn_s);
-				strcat(plmn_list_s," ");
-				strcat(plmn_list_s,plmn_s);
-			}
-			vty_out(vty, " tag-uli-with-serving-node-ip4%s%s"
-				   , plmn_list_s
+			vty_out(vty, " tag-uli-with-serving-node-ip4 %s%s"
+				   , plmn_s
 				   , VTY_NEWLINE);
-			FREE(plmn_list_s);
 		}
 
 		vty_out(vty, "!%s", VTY_NEWLINE);
@@ -1518,6 +1587,8 @@ gtp_apn_vty_init(void)
 	install_element(APN_NODE, &apn_ip_vrf_forwarding_cmd);
 	install_element(APN_NODE, &apn_gtp_session_uniq_ptype_cmd);
 	install_element(APN_NODE, &no_apn_gtp_session_uniq_ptype_cmd);
+	install_element(APN_NODE, &apn_hplmn_cmd);
+	install_element(APN_NODE, &no_apn_hplmn_cmd);
 	install_element(APN_NODE, &apn_tag_uli_with_serving_node_ip4_cmd);
 	install_element(APN_NODE, &no_apn_tag_uli_with_serving_node_ip4_cmd);
 

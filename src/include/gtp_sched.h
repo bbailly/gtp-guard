@@ -23,7 +23,7 @@
 #define _GTP_SCHED_H
 
 /* Prototypes */
-extern int gtp_sched(gtp_apn_t *, struct sockaddr_in *, struct sockaddr_in *);
-extern int gtp_sched_dynamic(gtp_apn_t *, const char *, const char *, struct sockaddr_in *, struct sockaddr_in *);
+extern int gtp_sched(gtp_apn_t *, struct sockaddr_in *, struct sockaddr_in *, gtp_roaming_status_t);
+extern int gtp_sched_dynamic(gtp_apn_t *, const char *, const char *, struct sockaddr_in *, struct sockaddr_in *, gtp_roaming_status_t);
 
 #endif
