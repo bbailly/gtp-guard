@@ -205,32 +205,30 @@ typedef struct _gtp1_ie_qos_profile {
 	uint8_t		arp;
 } __attribute__((packed)) gtp1_ie_qos_profile_t;
 
-
-#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI	0
-#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_SAI	1
-#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_RAI	2
-#define GTP1C_IE_ULI_TYPE			152
+#define GTP1C_IE_ULI_TYPE				152
 typedef struct _gtp1_ie_uli {
 	gtp1_ie_t	h;
-	uint8_t	geographic_location_type;
-	uint8_t mcc_mnc[3];
+	uint8_t		geographic_location_type;
+	uint8_t		mcc_mnc[3];
 	union {
 		struct {
-			uint16_t lac;
-			uint16_t ci;
-
+			uint16_t	lac;
+			uint16_t	ci;
 		} cgi;
 		struct {
-			uint16_t lac;
-			uint16_t sac;
+			uint16_t	lac;
+			uint16_t	sac;
 		} sai;
 		struct {
-			uint16_t lac;
-			uint16_t rac;
+			uint16_t	lac;
+			uint16_t	rac;
 		} rai;
-		uint32_t geographic_location_value;
-	} geographic_location;
+		uint32_t		value;
+	} u;
 } __attribute__((packed)) gtp1_ie_uli_t;
+#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI	0
+#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_SAI	(1 << 0)
+#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_RAI	(1 << 1)
 
 
 /*
@@ -387,7 +385,7 @@ typedef struct _gtp_ie_eps_bearer_id {
 	uint8_t		id;
 } __attribute__((packed)) gtp_ie_eps_bearer_id_t;
 
-#define GTP_IE_PAA_TYPE		79
+#define GTP_IE_PAA_TYPE					79
 typedef struct _gtp_ie_paa {
 	gtp_ie_t	h;
 	uint8_t		type;
@@ -395,19 +393,19 @@ typedef struct _gtp_ie_paa {
 } __attribute__((packed)) gtp_ie_paa_t;
 #define GTP_PAA_IPV4_TYPE	1
 
-#define GTP_IE_RAT_TYPE_TYPE		82
+#define GTP_IE_RAT_TYPE_TYPE				82
 typedef struct _gtp_ie_rat_type {
 	gtp_ie_t	h;
 	uint8_t		mcc_mnc[3];
 } __attribute__((packed)) gtp_ie_rat_type_t;
 
-#define GTP_IE_SERVING_NETWORK_TYPE		83
+#define GTP_IE_SERVING_NETWORK_TYPE			83
 typedef struct _gtp_ie_serving_network {
 	gtp_ie_t	h;
-	plmn_t		plmn;
+	uint8_t		mcc_mnc[3];
 } __attribute__((packed)) gtp_ie_serving_network_t;
 
-#define GTP_IE_ULI_TYPE			86
+#define GTP_IE_ULI_TYPE					86
 typedef struct _gtp_ie_uli {
 	gtp_ie_t	h;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -420,7 +418,7 @@ typedef struct _gtp_ie_uli {
 	uint8_t		macro_enbid:1;
 	uint8_t		extended_macro_enbid:1;
 #elif __BYTE_ORDER == __BIG_ENDIAN
- 	uint8_t		extended_macro_enbid:1;
+	uint8_t		extended_macro_enbid:1;
 	uint8_t		macro_enbid:1;
 	uint8_t		lai:1;
 	uint8_t		ecgi:1;
@@ -432,9 +430,8 @@ typedef struct _gtp_ie_uli {
 # error "Please fix <bits/endian.h>"
 #endif
 	/* Grouped identities in following order according
-	* to presence in previous bitfield:
-	CGI / SAI / RAI / TAI / ECGI / LAI / MacroeNBID / extMacroeNBID */
- 
+	 * to presence in previous bitfield:
+	 * CGI / SAI / RAI / TAI / ECGI / LAI / MacroeNBID / extMacroeNBID */
 } __attribute__((packed)) gtp_ie_uli_t;
 
 typedef struct _gtp_id_cgi {
@@ -461,34 +458,32 @@ typedef struct _gtp_id_tai {
 	uint16_t	tac;
 } __attribute__((packed)) gtp_id_tai_t;
 
-struct _ecgi{
-	#if __BYTE_ORDER == __LITTLE_ENDIAN
-				uint32_t	cellid:8;
-				uint32_t	enbid:20;
-				uint32_t	spare:4;
-	#elif __BYTE_ORDER == __BIG_ENDIAN
-				uint32_t	spare:4;
-				uint32_t	enbid:20;
-				uint32_t	cellid:8;
+typedef struct _gtp_ecgi {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	uint32_t	cellid:8;
+	uint32_t	enbid:20;
+	uint32_t	spare:4;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	uint32_t	spare:4;
+	uint32_t	enbid:20;
+	uint32_t	cellid:8;
 #else
-	# error "Please fix <bits/endian.h>"
-	#endif
-};
+# error "Please fix <bits/endian.h>"
+#endif
+} __attribute__((packed)) gtp_ecgi_t;
 
 typedef struct _gtp_id_ecgi {
-	uint8_t		mcc_mnc[3];
-	union ecgi_u
-	{
-		struct _ecgi ecgi_struct;
-		uint32_t ecgi_raw;
+	uint8_t			mcc_mnc[3];
+	union {
+		gtp_ecgi_t	ecgi;
+		uint32_t	value;
 	} u;
-} __attribute__ ((packed)) gtp_id_ecgi_t;
+} __attribute__((packed)) gtp_id_ecgi_t;
 
 typedef struct _gtp_id_lai {
 	uint8_t		mcc_mnc[3];
 	uint16_t	lac;
 } __attribute__((packed)) gtp_id_lai_t;
-
 
 #define GTP_IE_BEARER_CONTEXT_TYPE			93
 typedef struct _gtp_ie_bearer_context {
@@ -513,8 +508,6 @@ typedef struct _gtp_ie_apn_restriction {
 	gtp_ie_t	h;
 	uint8_t		value;
 } __attribute__((packed)) gtp_ie_apn_restriction_t;
-
-
 
 
 /*

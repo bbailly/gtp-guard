@@ -216,6 +216,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 {
 	gtp_ie_imsi_t *ie_imsi;
 	gtp_ie_apn_t *ie_apn;
+	gtp_ie_serving_network_t *ie_serving_network;
 	gtp_server_t *srv = w->srv;
 	gtp_switch_t *ctx = srv->ctx;
 	gtp_teid_t *teid = NULL;
@@ -224,7 +225,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	gtp_apn_t *apn;
 	bool retransmit = false;
 	uint64_t imsi;
-	uint8_t *cp;
+	uint8_t *cp, *serving_network;
 	char apn_str[64];
 	char apn_plmn[64];
 	int err;
@@ -254,6 +255,14 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	cp = gtp_get_ie(GTP_IE_F_TEID_TYPE, w->pbuff);
 	if (!cp) {
 		log_message(LOG_INFO, "%s(): no F_TEID IE present. ignoring..."
+				    , __FUNCTION__);
+		return NULL;
+	}
+
+	/* Serving Network */
+	serving_network = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
+	if (!serving_network) {
+		log_message(LOG_INFO, "%s(): no Serving Netwokr IE present. ignoring..."
 				    , __FUNCTION__);
 		return NULL;
 	}
@@ -317,7 +326,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
 	if(cp){
 		gtp_ie_serving_network_t* serving_network = (gtp_ie_serving_network_t*) cp;
-		memcpy(s->serving_plmn.plmn,serving_network->plmn, sizeof(serving_network->plmn));
+		memcpy(s->serving_plmn.plmn,serving_network->mcc_mnc, sizeof(serving_network->mcc_mnc));
 		char splmn_s[7];
 		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
 		log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
@@ -326,7 +335,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		gtp_stats_gtp_signalling_inc(w->stats, s->serving_plmn.plmn, addr, proto_gtpv2, dir_rx, GTP2C_CREATE_SESSION_REQUEST_TYPE, 0);
 	}
 
-	gtp_roaming_status_t roaming_status = gtp_get_roaming_status(ie_imsi->imsi, s->serving_plmn.plmn, &apn->hplmn_list);
+	gtp_roaming_status_t roaming_status = gtp_get_roaming_status(ie_imsi->imsi, s->serving_plmn.plmn, &apn->hplmn);
 	log_message(LOG_DEBUG, "%s(): current roaming status is %s"
 		, __FUNCTION__
 		, gtp_get_roaming_status_by_name(roaming_status));
@@ -339,8 +348,26 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		goto end;
 	}
 
-	log_message(LOG_INFO, "Create-Session-Req:={IMSI:%ld APN:%s F-TEID:0x%.8x}%s"
+	/* Set Serving PLMN */
+	ie_serving_network = (gtp_ie_serving_network_t *) serving_network;
+	memcpy(s->serving_plmn.plmn, ie_serving_network->mcc_mnc, GTP_PLMN_MAX_LEN);
+
+	/* Set session roaming status */
+	err = gtp_session_roaming_status_set(s);
+	if (err) {
+		log_message(LOG_INFO, "%s(): unable to set Roaming Status for IMSI:%ld"
+				    , __FUNCTION__
+				    , c->imsi);
+	}
+
+	/* ULI tag */
+	if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags) &&
+	    __test_bit(GTP_SESSION_FL_ROAMING_OUT, &s->flags))
+		gtp_ie_uli_update(w->pbuff, &apn->egci_plmn, (struct sockaddr_in *) addr);
+
+	log_message(LOG_INFO, "Create-Session-Req:={IMSI:%ld APN:%s F-TEID:0x%.8x Roaming-Status:%s}%s"
 			    , imsi, apn_str, ntohl(teid->id)
+			    , gtp_session_roaming_status_str(s)
 			    , (retransmit) ? " (retransmit)" : "");
 
 	if (retransmit) {
@@ -368,7 +395,8 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		err = gtp_ie_apn_extract_plmn(ie_apn, apn_plmn, 63);
 		if (err)
 			goto end;
-		err = gtp_sched_dynamic(apn, apn_str, apn_plmn, &teid->pgw_addr, &teid->sgw_addr, roaming_status);
+
+		err = gtp_sched_dynamic(apn, apn_str, apn_plmn, &teid->pgw_addr, &teid->sgw_addr, &s->flags);
 		if (err) {
 			log_message(LOG_INFO, "%s(): Unable to schedule pGW for apn:'%s.apn.epc.%s.3gppnetwork.org.'"
 					    , __FUNCTION__
@@ -381,28 +409,17 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		goto end;
 	}
 
-	err = gtp_sched(apn, &teid->pgw_addr, &teid->sgw_addr, roaming_status);
+	err = gtp_sched(apn, &teid->pgw_addr, &teid->sgw_addr, &s->flags);
 	if (err) {
 		log_message(LOG_INFO, "%s(): Unable to schedule pGW for apn:%s"
 				    , __FUNCTION__
 				    , apn->name);
-	}
+		gtp_teid_put(teid);
+		gtp_session_destroy(s);
+		teid = NULL;
+    }
 
   end:
-	/*  if ecgi/cgi override feature activated for the apn */
-	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &apn->flags)){
-		log_message(LOG_DEBUG, "%s(): GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4 is set"
-			, __FUNCTION__);
-		if(roaming_status == GTP_ROAMING_STATUS_ROAMING_OUT){
-			/* Rewrite ULI by adding SGW */
-			cp = gtp_get_ie(GTP_IE_ULI_TYPE, w->pbuff);
-			if(cp){
-				gtpv2_ie_uli_rewrite(apn->override_plmn, &c->sgw_addr, (gtp_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
-			}else{
-				gtpv2_ie_uli_add(apn->override_plmn, &c->sgw_addr,(pkt_buffer_t *)w->pbuff);
-			}
-		}
-	}
 	gtp_conn_put(c);
 	return teid;
 }
@@ -630,12 +647,14 @@ static gtp_teid_t *
 gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr, int direction)
 {
 	gtp_hdr_t *h = (gtp_hdr_t *) w->pbuff->head;
+	gtp_ie_serving_network_t *ie_serving_network;
 	gtp_server_t *srv = w->srv;
 	gtp_switch_t *ctx = srv->ctx;
 	gtp_teid_t *teid = NULL, *t, *t_u = NULL, *pteid;
 	gtp_session_t *s;
 	bool mobility = false;
 	uint8_t *cp;
+	int err;
 
 	teid = gtp_vteid_get(&ctx->vteid_tab, ntohl(h->teid));
 	if (!teid) {
@@ -651,10 +670,6 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		teid->version = 2;
 	}
 
-	log_message(LOG_INFO, "Modify-Bearer-Req:={F-TEID:0x%.8x}%s"
-			    , ntohl(teid->id)
-			    , mobility ? " (3G Mobility)" : "");
-
 	/* IMSI rewrite if needed */
 	cp = gtp_get_ie(GTP_IE_IMSI_TYPE, w->pbuff);
 	if (cp) {
@@ -669,37 +684,30 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	gtp_teid_update_sgw(teid, addr);
 	gtp_teid_update_sgw(teid->peer_teid, addr);
 
+	/* Update Serving Network */
 	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
-	if(cp){
-		gtp_ie_serving_network_t* serving_network = (gtp_ie_serving_network_t*) cp;
-		memcpy(s->serving_plmn.plmn,serving_network->plmn, sizeof(serving_network->plmn));
-		char splmn_s[7];
-		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
-		log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
-			, __FUNCTION__
-			, splmn_s);
-
+	if (cp) {
+		ie_serving_network = (gtp_ie_serving_network_t *) cp;
+		memcpy(s->serving_plmn.plmn, ie_serving_network->mcc_mnc, GTP_PLMN_MAX_LEN);
 	}
 
-	gtp_roaming_status_t roaming_status = gtp_get_roaming_status(s->imsi, s->serving_plmn.plmn, &s->apn->hplmn_list);
-	char splmn_s[7];
-	plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
-	log_message(LOG_DEBUG, "%s(): current roaming status is %s"
-		, __FUNCTION__
-		, gtp_get_roaming_status_by_name(roaming_status));
-
-	/*  if ecgi/cgi override feature activated for the apn */
-	if(__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &s->apn->flags)){
-		if(roaming_status == GTP_ROAMING_STATUS_ROAMING_OUT){
-			/* Rewrite ULI by adding SGW */
-			cp = gtp_get_ie(GTP_IE_ULI_TYPE, w->pbuff);
-			if(cp){
-				gtpv2_ie_uli_rewrite(s->apn->override_plmn, (struct sockaddr_in*) addr, (gtp_ie_uli_t *)cp, (pkt_buffer_t *)w->pbuff);
-			}else{
-				gtpv2_ie_uli_add(s->apn->override_plmn, (struct sockaddr_in*) addr,(pkt_buffer_t *)w->pbuff);
-			}
-		}
+	/* Update session roaming status */
+	err = gtp_session_roaming_status_set(s);
+	if (err) {
+		log_message(LOG_INFO, "%s(): unable to update Roaming Status for IMSI:%ld"
+				    , __FUNCTION__
+				    , s->conn->imsi);
 	}
+
+	/* ULI tag */
+	if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &s->apn->flags) &&
+	    __test_bit(GTP_SESSION_FL_ROAMING_OUT, &s->flags))
+		gtp_ie_uli_update(w->pbuff, &s->apn->egci_plmn, (struct sockaddr_in *) addr);
+
+	log_message(LOG_INFO, "Modify-Bearer-Req:={F-TEID:0x%.8x Roamng-Status:%s}%s"
+			    , ntohl(teid->id)
+			    , gtp_session_roaming_status_str(s)
+			    , mobility ? " (3G Mobility)" : "");
 
 	/* Update SQN */
 	gtp_sqn_update(w, teid);

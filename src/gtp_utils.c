@@ -22,6 +22,7 @@
 /* system includes */
 #include <unistd.h>
 #include <pthread.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
@@ -139,81 +140,9 @@ gtp1_ie_apn_extract(gtp1_ie_apn_t *apn, char *buffer, size_t size)
 	return 0;
 }
 
-int
-gtpv1_uli_rewrite_geographic_location(gtp_plmn_t* override_plmn, struct sockaddr_in *sgsn_addr, gtp1_ie_uli_t *uli, pkt_buffer_t *pkt)
-{
-	uint8_t *cp = (uint8_t *) uli;
-	int delta = 0;
-
-	log_message(LOG_DEBUG, "%s(): trying to overwrite gtpv1 ULI"
-		, __FUNCTION__);
-
-
-	memcpy(uli->mcc_mnc, &override_plmn->plmn, sizeof(override_plmn->plmn));
-	uli->geographic_location_type = GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI;
-	uli->geographic_location.geographic_location_value = ntohl(sgsn_addr->sin_addr.s_addr);
-	log_message(LOG_DEBUG, "%s(): sgw_addr=0x%08x, geographic_location_type=0x%02x, geographic_location_value=0x%08x"
-		, __FUNCTION__
-		, ntohl(sgsn_addr->sin_addr.s_addr), uli->geographic_location_type, uli->geographic_location.geographic_location_value);
-
-	/* Override PLMN and write SGSN IPv4 address */
-	memcpy((uint8_t *)cp, uli, sizeof(gtp1_ie_uli_t) - sizeof(uli->geographic_location.geographic_location_value));
-	uint32_t geographic_location_value_to_send = htonl(uli->geographic_location.geographic_location_value);
-	memcpy((uint8_t *)cp + sizeof(gtp1_ie_uli_t) - sizeof(uli->geographic_location.geographic_location_value), &geographic_location_value_to_send, sizeof(geographic_location_value_to_send));
-	return delta;
-}
-
-
-int
-gtpv1_ie_uli_rewrite(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, gtp1_ie_uli_t *ie_uli, pkt_buffer_t *buffer)
-{
-	return gtpv1_uli_rewrite_geographic_location(override_plmn, sgw_addr, ie_uli,buffer);
-}
-
-
-int
-gtpv1_ie_uli_add(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
-{
-	uint8_t *cp;
-	int tail_len;
-
-	log_message(LOG_DEBUG, "%s(): a ULI will be added"
-		, __FUNCTION__);
-
-	/* Find Serving Network IE or RAT TYPE IE to add ULI IE before */
-	cp = gtp1_get_ie(GTP1C_IE_QOS_PROFILE_TYPE, buffer);
-	if(!cp){
-		log_message(LOG_WARNING, "%s(): Can't add ULI IE because no QoS Profile IE is present !!!"
-			, __FUNCTION__);
-		return 0;
-	}
-
-	uint16_t delta = sizeof(gtp1_ie_uli_t);
-	/* Bounds checking */
-	if (pkt_buffer_tailroom(buffer) < delta) {
-		log_message(LOG_WARNING, "%s(): Warning Bounds Check failed pkt_tailroom:%d delta:%d !!!"
-			, __FUNCTION__
-			, pkt_buffer_tailroom(buffer), delta);
-		return 0;
-	}
-	tail_len = buffer->end - cp;
-	/* Move end of the packet to have space to introduce an eCGI*/
-	memmove(cp + delta, cp, tail_len);
-
-	gtp1_hdr_t *gtph = (gtp1_hdr_t *) buffer->head;
-	gtph->length = htons(ntohs(gtph->length) + delta);
-	buffer->end += delta;
-	gtp1_ie_uli_t uli;
-	uli.h.length = htons(sizeof(gtp1_ie_uli_t) - sizeof(gtp1_ie_t));
-	uli.h.type = GTP1C_IE_ULI_TYPE;
-	memcpy(cp, &uli, sizeof(gtp1_ie_uli_t));
-
-	return gtpv1_uli_rewrite_geographic_location(override_plmn, sgw_addr, (gtp1_ie_uli_t *)cp,buffer) + delta;
-}
-
 
 /*
- *      GTPv2 utilities
+ *	GTPv2 utilities
  */
 
 int plmn_string_to_bcd(const char* plmn_s, uint8_t * plmn){
@@ -270,23 +199,23 @@ int64_t
 bcd_to_int64(const uint8_t *buffer, size_t size)
 {
 	int64_t value = 0;
-        uint8_t high, low;
+	uint8_t high, low;
 	int i;
 
 	/* With bit swapping */
-        for (i = 0; i < size; i++) {
-                low = (buffer[i] & 0xf0) >> 4;
-                high = buffer[i] & 0x0f;
-                if (high > 9)
-                        return value;
-                value = (value * 10) + high;
+	for (i = 0; i < size; i++) {
+		low = (buffer[i] & 0xf0) >> 4;
+		high = buffer[i] & 0x0f;
+		if (high > 9)
+			return value;
+		value = (value * 10) + high;
 
-                if (low > 9)
-                        return value;
-                value = (value * 10) + low;
-        }
+		if (low > 9)
+			return value;
+		value = (value * 10) + low;
+	}
 
-        return value;
+	return value;
 }
 
 int
@@ -340,6 +269,113 @@ int64_to_bcd(const uint64_t value, uint8_t *buffer, size_t size)
 	return 0;
 }
 
+/* PLMN Related */
+int
+str_plmn_to_bcd(const char *src, uint8_t *dst, size_t dsize)
+{
+	static char digits[] = "0123456789";
+	int str_len = strlen(src);
+	const char *end = src + str_len, *cp, *pch;
+	char tmp;
+	int i = 0;
+
+	/* Never more than 6 digits */
+	if (str_len > 6)
+		return -1;
+
+	if (str_len / 2 > dsize)
+		return -1;
+	memset(dst, 0, dsize);
+
+	for (cp = src; cp < end; cp++) {
+		pch = strchr(digits, tolower((int) *cp));
+		if (!pch)
+			return -1;
+
+		tmp = (uint8_t) (pch - digits) << 4 * !!(i % 2);
+
+		/* MNC can be 2 or 3 digits. In that last
+		 * case, last digit of MNC replace 'f' in
+		 * BCD buffer output... */
+		if (i == 6) {
+			dst[1] = (tmp << 4) | (dst[1] & 0x0f);
+			break;
+		}
+
+		dst[i / 2] |= tmp;
+
+		/* MCC is always 3 digits */
+		if (++i == 3)
+			dst[i++ / 2] |= 0xf0;
+	}
+
+	return 0;
+}
+
+int64_t
+bcd_plmn_to_int64(const uint8_t *src, size_t ssize)
+{
+	int64_t plmn = 0;
+	int i;
+
+	if (ssize != 3)
+		return -1;
+
+	for (i = 0; i < ssize; i++) {
+		plmn = 10 * plmn + (src[i] & 0x0f);
+		if ((src[i] >> 4) != 0xf)
+			plmn = 10 * plmn + (src[i] >> 4);
+	}
+
+	/* Last digit of MNC */
+	if ((src[1] >> 4) != 0xf)
+		plmn = 10 * plmn + (src[1] >> 4);
+
+	return plmn;
+}
+
+int
+bcd_plmn_cmp(const uint8_t *a, const uint8_t *b)
+{
+	int i;
+
+	for (i = 0; i < 3; i++) {
+		if (a[i] ^ b[i])
+			return -1;
+	}
+
+	return 0;
+}
+
+bool
+bcd_imsi_plmn_match(const uint8_t *imsi, const uint8_t *plmn)
+{
+	uint8_t tmp;
+
+	/* a bit manual to keep it readable... */
+
+	/* MCC matching */
+	if (imsi[0] ^ plmn[0])
+		return false;
+
+	if ((imsi[1] ^ plmn[1]) & 0x0f)
+		return false;
+
+	/* MNC matching */
+	tmp = (imsi[1] >> 4) | (imsi[2] << 4);
+	if (plmn[2] ^ tmp)
+		return false;
+
+	/* MNC is 3 digits ? */
+	if ((plmn[1] >> 4) != 0xf) {
+		if ((imsi[2] >> 4) ^ (plmn[1] >> 4))
+			return false;
+	}
+
+	return true;
+}
+
+/* IMSI related */
 int
 gtp_imsi_ether_addr_build(const uint64_t imsi, struct ether_addr *eth, uint8_t id)
 {
@@ -378,6 +414,7 @@ gtp_imsi_rewrite(gtp_apn_t *apn, uint8_t *imsi)
 	gtp_rewrite_rule_t *rule, *rule_match = NULL;
 	int len;
 
+	/* FIXME: this list MUST be protected or use lock-less */
 	if (list_empty(l))
 		return -1;
 
@@ -416,128 +453,7 @@ gtp_ie_imsi_rewrite(gtp_apn_t *apn, uint8_t *buffer)
 	return gtp_imsi_rewrite(apn, ie_imsi->imsi);
 }
 
-int
-gtpv2_uli_rewrite_ecgi(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, gtp_ie_uli_t *uli, pkt_buffer_t *pkt)
-{
-	uint8_t *cp = (uint8_t *) uli;
-	int delta = 0, tail_len;
-
-	/* Move to the ecgi*/
-	size_t offset = 0;
-	offset += (uli->cgi) ? sizeof(gtp_id_cgi_t) : 0;
-	offset += (uli->sai) ? sizeof(gtp_id_sai_t) : 0;
-	offset += (uli->rai) ? sizeof(gtp_id_rai_t) : 0;
-	offset += (uli->tai) ? sizeof(gtp_id_tai_t) : 0;
-	/* Grouped identities in following order according
-	* to presence in previous bitfield:
-	CGI / SAI / RAI / TAI / ECGI / LAI / MacroeNBID / extMacroeNBID */
-	cp += sizeof(gtp_ie_uli_t) + offset;
-
-	/* if no ecgi add it */
-	if (!uli->ecgi){
-		log_message(LOG_DEBUG, "%s(): a ecgi will be added in ULI"
-			, __FUNCTION__);
-
-		/* Bounds checking */
-		delta = sizeof(gtp_id_ecgi_t);
-		if (pkt_buffer_tailroom(pkt) < delta) {
-			log_message(LOG_WARNING, "%s(): Warning Bounds Check failed pkt_tailroom:%d delta:%d !!!"
-				, __FUNCTION__
-				, pkt_buffer_tailroom(pkt), delta);
-			return 0;
-		}
-		tail_len = pkt->end - cp;
-		/* Move end of the packet to have space to introduce an eCGI*/
-		memmove(cp + delta, cp, tail_len);
-
-		/* Change the eCGI flag in ULI header */
-		uli->ecgi = 1;
-
-		/* Update IE length, message length and packet length */
-		uli->h.length = htons(ntohs(uli->h.length) + delta);
-		gtp_hdr_t *gtph = (gtp_hdr_t *) pkt->head;
-		gtph->length = htons(ntohs(gtph->length) + delta);
-		pkt->end += delta;
-	}
-	log_message(LOG_DEBUG, "%s(): trying to overwrite ecgi"
-		, __FUNCTION__);
-
-
-	gtp_id_ecgi_t ecgi;
-	memcpy(&ecgi.mcc_mnc, override_plmn->plmn,sizeof(ecgi.mcc_mnc));
-	ecgi.u.ecgi_raw = ntohl(sgw_addr->sin_addr.s_addr);
-	log_message(LOG_DEBUG, "%s(): sgw_addr=0x%08x, spare=0x%01x, enbid=0x%05x, cellid=0x%02x"
-		, __FUNCTION__
-		, ntohl(sgw_addr->sin_addr.s_addr), ecgi.u.ecgi_struct.spare, ecgi.u.ecgi_struct.enbid, ecgi.u.ecgi_struct.cellid);
-
-	/* Override PLMN and write SGW IPv4 address */
-	const uint32_t ecgi_to_send = htonl(ecgi.u.ecgi_raw);
-	memcpy((uint8_t *)cp, &ecgi.mcc_mnc, sizeof(ecgi.mcc_mnc));
-	memcpy((uint8_t *)cp + sizeof(ecgi.mcc_mnc), &ecgi_to_send, sizeof(ecgi_to_send));
-
-	return delta;
-}
-
-
-int
-gtpv2_ie_uli_rewrite(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, gtp_ie_uli_t *ie_uli, pkt_buffer_t *buffer)
-{
-	return gtpv2_uli_rewrite_ecgi(override_plmn, sgw_addr, ie_uli, buffer);
-}
-
-
-int
-gtpv2_ie_uli_add(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, pkt_buffer_t *buffer)
-{
-	uint8_t *cp;
-	int tail_len;
-
-	log_message(LOG_DEBUG, "%s(): a ULI will be added"
-		, __FUNCTION__);
-
-	/* Find Serving Network IE or RAT TYPE IE to add ULI IE before */
-	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, buffer);
-	if(!cp){
-		cp = gtp_get_ie(GTP_IE_RAT_TYPE_TYPE, buffer);
-		if(!cp){
-			log_message(LOG_WARNING, "%s(): Can't add ULI IE because no Serving Network IE and RAT TYPE IE are present !!!"
-				, __FUNCTION__);
-			return 0;
-		}
-	}
-
-	uint16_t delta = sizeof(gtp_ie_uli_t);
-	/* Bounds checking */
-	if (pkt_buffer_tailroom(buffer) < delta) {
-		log_message(LOG_WARNING, "%s(): Warning Bounds Check failed pkt_tailroom:%d delta:%d !!!"
-			, __FUNCTION__
-			, pkt_buffer_tailroom(buffer), delta);
-		return 0;
-	}
-	tail_len = buffer->end - cp;
-	/* Move end of the packet to have space to introduce an eCGI*/
-	memmove(cp + delta, cp, tail_len);
-
-	gtp_hdr_t *gtph = (gtp_hdr_t *) buffer->head;
-	gtph->length = htons(ntohs(gtph->length) + delta);
-	buffer->end += delta;
-	gtp_ie_uli_t uli;
-	uli.h.instance = 0;
-	uli.h.length = htons(1);
-	uli.h.type = GTP_IE_ULI_TYPE;
-	uli.cgi = 0;
-	uli.ecgi = 0;
-	uli.extended_macro_enbid = 0;
-	uli.lai = 0;
-	uli.macro_enbid = 0;
-	uli.rai = 0;
-	uli.sai = 0;
-	uli.tai = 0;
-	memcpy(cp, &uli, sizeof(gtp_ie_uli_t));
-
-	return gtpv2_uli_rewrite_ecgi(override_plmn, sgw_addr, (gtp_ie_uli_t *)cp,buffer) + delta;
-}
-
+/* APN related */
 int
 gtp_apn_extract_ni(char *apn, size_t apn_size, char *buffer, size_t size)
 {
@@ -661,7 +577,7 @@ gtp_ie_apn_rewrite(gtp_apn_t *apn, gtp_ie_apn_t *ie_apn, size_t offset_ni)
 	memset(apn_oi, 0, 32);
 	gtp_ie_apn_extract_oi(ie_apn, apn_oi, 32);
 
-    list_for_each_entry(rule, l, next) {
+	list_for_each_entry(rule, l, next) {
 		if (strncmp(rule->match, apn_oi, rule->match_len) == 0) {
 			gtp_ie_apn_rewrite_oi(ie_apn, offset_ni, rule->rewrite);
 			return 0;
@@ -669,44 +585,6 @@ gtp_ie_apn_rewrite(gtp_apn_t *apn, gtp_ie_apn_t *ie_apn, size_t offset_ni)
 	}
 
 	return -1;
-}
-
-gtp_id_ecgi_t *
-gtp_ie_uli_extract_ecgi(gtp_ie_uli_t *uli)
-{
-	size_t offset = 0;
-
-	if (!uli->ecgi)
-		return NULL;
-
-	offset += (uli->cgi) ? sizeof(gtp_id_cgi_t) : 0;
-	offset += (uli->sai) ? sizeof(gtp_id_sai_t) : 0;
-	offset += (uli->rai) ? sizeof(gtp_id_rai_t) : 0;
-	offset += (uli->tai) ? sizeof(gtp_id_tai_t) : 0;
-
-	/* overflow protection */
-	if (offset + sizeof(gtp_id_ecgi_t) > ntohs(uli->h.length))
-		return NULL;
-
-	offset += sizeof(gtp_ie_uli_t);
-	return (gtp_id_ecgi_t *) ((uint8_t *)uli + offset);
-}
-
-int
-gtp_id_ecgi_str(gtp_id_ecgi_t *ecgi, char *buffer, size_t size)
-{
-	int mcc, mnc;
-
-	if (!ecgi) {
-		bsd_strlcpy(buffer, "0+0+0+0", size);
-		return -1;
-	}
-
-	mcc = bcd_to_int64(ecgi->mcc_mnc, 2);
-	mnc = bcd_to_int64(ecgi->mcc_mnc+2, 1);
-
-	return snprintf(buffer, size, "%d+%d+%d+%d"
-			      , mcc, mnc, ntohl(ecgi->u.ecgi_struct.enbid), ecgi->u.ecgi_struct.cellid);
 }
 
 int
@@ -823,7 +701,7 @@ gtp_roaming_status_t gtp_get_roaming_status(uint8_t *imsi, uint8_t *serving_plmn
 		return GTP_ROAMING_STATUS_ROAMING_IN;
 	}
 	/* if the serving PLMN matches the IMSI PLMN */
-	if(memcmp(serving_plmn, imsi, GTP_PLMN_LEN)){
+	if(memcmp(serving_plmn, imsi, GTP_PLMN_MAX_LEN)){
 		return GTP_ROAMING_STATUS_HPLMN;
 	}
 	gtp_plmn_t *hplmn;
@@ -863,12 +741,12 @@ gtpu_get_header_len(pkt_buffer_t *buffer)
 		if (pkt_buffer_len(buffer) < len)
 			return -1;
 
-	        /*
-	         * TS29.281
-	         * 5.2.1 General format of the GTP-U Extension Header
-	         *
-	         * If no such Header follows,
-	         * then the value of the Next Extension Header Type shall be 0. */
+		/*
+		 * TS29.281
+		 * 5.2.1 General format of the GTP-U Extension Header
+		 *
+		 * If no such Header follows,
+		 * then the value of the Next Extension Header Type shall be 0. */
 		while (*(ext_h = (buffer->head + len - 1))) {
 			/*
 		 	 * The length of the Extension header shall be defined
@@ -889,12 +767,13 @@ gtpu_get_header_len(pkt_buffer_t *buffer)
 		 * For example, if only the E flag is set to 1, then
 		 * the N-PDU Number and Sequence Number fields shall also be present,
 		 * but will not have meaningful values and shall not be evaluated.
-	         */
+		 */
 		len += 4;
 	}
 
 	return (pkt_buffer_len(buffer) < len) ? -1 : len;
 }
+
 
 /*
  *	Stringify enum gtp_flags of flags

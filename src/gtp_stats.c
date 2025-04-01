@@ -33,7 +33,7 @@ gtp_stats_ip_hashkey(gtp_htab_t *h, struct sockaddr *ip)
 
 
  gtp_ip_stats_t *
- __gtp_stats_ip_hash(gtp_htab_t *h, struct sockaddr ip)
+ __gtp_stats_ip_hash(gtp_htab_t *h, struct sockaddr *ip)
  {
 	 struct hlist_head *ip_stats_head;
 	 gtp_ip_stats_t *ip_stats;
@@ -41,21 +41,21 @@ gtp_stats_ip_hashkey(gtp_htab_t *h, struct sockaddr *ip)
  
 	 struct hlist_node *n;
 	 hlist_for_each_entry(ip_stats, n, ip_stats_head, hlist){
-		if(ip.sa_family == ip.sa_family){
-			if(!memcmp(ip_stats->ip.sa_data, ip.sa_data, sizeof(struct sockaddr))){
+		if(ip_stats->ip.sa_family == ip->sa_family){
+			if(!memcmp(ip_stats->ip.sa_data, ip->sa_data, sizeof(struct sockaddr))){
 				log_message(LOG_DEBUG, "%s(): IP 0x%x already present"
 					, __FUNCTION__
-					, ip.sa_data);	
+					, ip->sa_data);	
 				return ip_stats;
 			}
 		}
 	 }
 	log_message(LOG_DEBUG, "%s(): IP %s not present adding it"
 		, __FUNCTION__
-		, ip.sa_data);
+		, ip->sa_data);
 		ip_stats = MALLOC(sizeof(gtp_plmn_stats_t));
-	ip_stats->ip.sa_family = ip.sa_family;
-	memcpy(ip_stats->ip.sa_data, ip.sa_data, sizeof(struct sockaddr));
+	ip_stats->ip.sa_family = ip->sa_family;
+	memcpy(ip_stats->ip.sa_data, ip->sa_data, sizeof(struct sockaddr));
 	hlist_add_head(&ip_stats->hlist, ip_stats_head);
 	return ip_stats;
  }

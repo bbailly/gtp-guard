@@ -80,40 +80,10 @@ gtp_sched_pgw_wlc(gtp_naptr_t *naptr, struct sockaddr_in *addr_skip)
 }
 
 static gtp_pgw_t *
-gtp_sched_naptr(list_head_t *l, const char *resolution_services, struct sockaddr_in *addr_skip, gtp_roaming_status_t roaming_status)
+__gtp_sched_naptr(list_head_t *l, const char *service, struct sockaddr_in *addr_skip)
 {
 	gtp_naptr_t *naptr, *least = NULL;
 	gtp_pgw_t *pgw = NULL;
-	char * protocol;
-
-	switch(roaming_status){
-		case GTP_ROAMING_STATUS_HPLMN:
-			protocol = "x-3gpp-pgw:x-s5-gtp";
-			break;
-		case GTP_ROAMING_STATUS_ROAMING_IN:
-		case GTP_ROAMING_STATUS_ROAMING_OUT:
-			protocol = "x-3gpp-pgw:x-s8-gtp";
-			break;
-		default:
-			log_message(LOG_INFO, "%s(): unexpected roaming status received: %d (%s)"
-				, __FUNCTION__
-				, roaming_status, gtp_get_roaming_status_by_name(roaming_status));
-			return NULL;
-	}
-
-	char * service;
-	if(strcmp(resolution_services,"")){
-		service = MALLOC(strlen(protocol) + 1 + strlen(resolution_services) + 1);
-		strcat(service, protocol);
-		strcat(service, "+");
-		strcat(service, resolution_services);
-	}else{
-		service = MALLOC(strlen(protocol) + 1);
-		strcat(service, protocol);
-	}
-	log_message(LOG_DEBUG, "%s(): the following service parameter will be used: %s"
-		, __FUNCTION__
-		, service);
 
 	/* First stage: Reset previous scheduling flags */
 	list_for_each_entry(naptr, l, next)
@@ -130,7 +100,6 @@ gtp_sched_naptr(list_head_t *l, const char *resolution_services, struct sockaddr
 			least = naptr;
 	}
 	if (!least){
-		FREE(service);
 		return NULL;
 	}
 
@@ -142,20 +111,26 @@ gtp_sched_naptr(list_head_t *l, const char *resolution_services, struct sockaddr
 		goto shoot_again;
 	}
 
-	FREE(service);
 	return pgw;
 }
 
 static int
-gtp_sched_generic(gtp_apn_t *apn, list_head_t *l, struct sockaddr_in *addr, struct sockaddr_in *addr_skip, gtp_roaming_status_t roaming_status)
+gtp_sched_generic(gtp_apn_t *apn, list_head_t *l, const char *service_base,
+		  struct sockaddr_in *addr, struct sockaddr_in *addr_skip)
 {
+	char service_str[GTP_SCHED_MAX_LEN+1] = {};
 	gtp_service_t *service;
 	gtp_pgw_t *pgw = NULL;
+	int err;
 
 	/* Service selection list is already sorted by prio */
 	pthread_mutex_lock(&apn->mutex);
 	list_for_each_entry(service, &apn->service_selection, next) {
-		pgw = gtp_sched_naptr(l, service->str, addr_skip, roaming_status);
+		err = snprintf(service_str, GTP_SCHED_MAX_LEN, "%s+%s", service_base, service->str);
+		if (err < 0)
+			continue;
+
+		pgw = __gtp_sched_naptr(l, service_str, addr_skip);
 		if (pgw) {
 			*addr = *(struct sockaddr_in *) &pgw->addr;
 			pthread_mutex_unlock(&apn->mutex);
@@ -167,14 +142,60 @@ gtp_sched_generic(gtp_apn_t *apn, list_head_t *l, struct sockaddr_in *addr, stru
 	return -1;
 }
 
-int
-gtp_sched(gtp_apn_t *apn, struct sockaddr_in *addr, struct sockaddr_in *addr_skip, gtp_roaming_status_t roaming_status)
+static const char *
+gtp_sched_roaming_status_to_str(unsigned long *flags)
 {
-	return gtp_sched_generic(apn, &apn->naptr, addr, addr_skip, roaming_status);
+	if (__test_bit(GTP_SESSION_FL_HPLMN, flags))
+		return "x-3gpp-pgw:x-s5-gtp";
+
+	if (__test_bit(GTP_SESSION_FL_ROAMING_OUT, flags) ||
+	    __test_bit(GTP_SESSION_FL_ROAMING_IN, flags))
+		return "x-3gpp-pgw:x-s8-gtp";
+
+	return NULL;
+}
+
+static int
+gtp_sched_or_fallback(gtp_apn_t *apn, list_head_t *l,
+		      struct sockaddr_in *addr, struct sockaddr_in *addr_skip, unsigned long *flags)
+{
+	const char *service_base = gtp_sched_roaming_status_to_str(flags);
+	gtp_pgw_t *pgw = NULL;
+	int err;
+
+	if (!service_base) {
+		log_message(LOG_INFO, "%s(): unknown Roaming-Status", __FUNCTION__);
+		return -1;
+	}
+
+	/* Service selection matching */
+	err = gtp_sched_generic(apn, l, service_base, addr, addr_skip);
+	if (!err)
+		return 0;
+
+	/* Fallback to service base selection */
+	pthread_mutex_lock(&apn->mutex);
+	pgw = __gtp_sched_naptr(l, service_base, addr_skip);
+	if (pgw) {
+		*addr = *(struct sockaddr_in *) &pgw->addr;
+		pthread_mutex_unlock(&apn->mutex);
+		return 0;
+	}
+	pthread_mutex_unlock(&apn->mutex);
+
+	return -1;
 }
 
 int
-gtp_sched_dynamic(gtp_apn_t *apn, const char *apn_name, const char *plmn, struct sockaddr_in *addr, struct sockaddr_in *addr_skip, gtp_roaming_status_t roaming_status)
+gtp_sched(gtp_apn_t *apn, struct sockaddr_in *addr, struct sockaddr_in *addr_skip, unsigned long *flags)
+{
+	return gtp_sched_or_fallback(apn, &apn->naptr, addr, addr_skip, flags);
+}
+
+int
+gtp_sched_dynamic(gtp_apn_t *apn, const char *apn_name, const char *plmn,
+		  struct sockaddr_in *addr, struct sockaddr_in *addr_skip,
+		  unsigned long *flags)
 {
 	gtp_resolv_ctx_t *ctx;
 	list_head_t l;
@@ -185,7 +206,7 @@ gtp_sched_dynamic(gtp_apn_t *apn, const char *apn_name, const char *plmn, struct
 		return -1;
 
 	INIT_LIST_HEAD(&l);
-	err = gtp_resolv_naptr(ctx, &l, "%s.apn.epc.%s.3gppnetwork.org.", apn_name, plmn, roaming_status);
+	err = gtp_resolv_naptr(ctx, &l, "%s.apn.epc.%s.3gppnetwork.org.", apn_name, plmn);
 	if (err) {
 		log_message(LOG_INFO, "%s(): Unable to resolv apn:'%s.apn.epc.%s.3gppnetwork.org.'"
 				    , __FUNCTION__, apn_name, plmn);
@@ -199,7 +220,7 @@ gtp_sched_dynamic(gtp_apn_t *apn, const char *apn_name, const char *plmn, struct
 		goto end;
 	}
 
-	err = gtp_sched_generic(apn, &l, addr, addr_skip, roaming_status);
+	err = gtp_sched_or_fallback(apn, &l, addr, addr_skip, flags);
 
   end:
 	gtp_resolv_ctx_destroy(ctx);
