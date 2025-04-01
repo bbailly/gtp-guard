@@ -53,6 +53,7 @@ typedef enum _node_type {
 	APN_NODE,					/* APN commands. */
 	GTP_SWITCH_NODE,				/* GTP Switch commands. */
 	GTP_ROUTER_NODE,				/* GTP Router commands. */
+	STATS_NODE,					/* Statistics commands. */
 
 	VTY_NODE,					/* Vty node. */
 } node_type_t;

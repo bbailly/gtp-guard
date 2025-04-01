@@ -191,6 +191,12 @@ gtp_server_worker_alloc(gtp_server_t *srv, int id)
 	worker->seed = time(NULL);
 	srand(worker->seed);
 	worker->pbuff = pkt_buffer_alloc(GTP_BUFFER_SIZE);
+	worker->stats.signalling_gtp = MALLOC(sizeof(gtp_signalling_gtp_stats_t));
+	worker->stats.signalling_pppoe = MALLOC(sizeof(gtp_signalling_pppoe_stats_t));
+	worker->stats.signalling_gtp->plmns = MALLOC(sizeof(gtp_htab_t));
+	worker->stats.signalling_pppoe->instances = MALLOC(sizeof(gtp_htab_t));
+	gtp_htab_init(worker->stats.signalling_gtp->plmns, STATS_GTP_PLMN_HASHTAB_SIZE);
+	gtp_htab_init(worker->stats.signalling_pppoe->instances, STATS_GTP_PLMN_HASHTAB_SIZE);
 
 	pthread_mutex_lock(&srv->workers_mutex);
 	list_add_tail(&worker->next, &srv->workers);

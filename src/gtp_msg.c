@@ -35,7 +35,7 @@
 size_t
 gtp_msg_hlen(gtp_hdr_t *h)
 {
-	size_t len = GTPV2C_HEADER_LEN;
+	size_t len = GTP2C_HEADER_LEN;
 
 	if (!h->teid_presence)
 		len -= GTP_TEID_LEN;

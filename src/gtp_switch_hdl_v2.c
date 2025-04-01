@@ -206,7 +206,7 @@ gtpc_echo_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr, int
 		rec->recovery = daemon_data->restart_counter;
 	}
 
-	h->type = GTP_ECHO_RESPONSE_TYPE;
+	h->type = GTP2C_ECHO_RESPONSE_TYPE;
 
 	return &dummy_teid;
 }
@@ -317,13 +317,13 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
 	if(cp){
 		gtp_ie_serving_network_t* serving_network = (gtp_ie_serving_network_t*) cp;
-		memcpy(s->serving_plmn.plmn,serving_network->mcc_mnc, sizeof(serving_network->mcc_mnc));
+		memcpy(s->serving_plmn.plmn,serving_network->plmn, sizeof(serving_network->plmn));
 		char splmn_s[7];
 		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
 		log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
 			, __FUNCTION__
 			, splmn_s);
-
+		gtp_stats_gtp_signalling_inc(w->stats, s->serving_plmn.plmn, addr, proto_gtpv2, dir_rx, GTP2C_CREATE_SESSION_REQUEST_TYPE, 0);
 	}
 
 	gtp_roaming_status_t roaming_status = gtp_get_roaming_status(ie_imsi->imsi, s->serving_plmn.plmn, &apn->hplmn_list);
@@ -616,9 +616,9 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 	cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
 	if (cp) {
 		ie_cause = (gtp_ie_cause_t *) cp;
-		if ((ie_cause->value >= GTP_CAUSE_REQUEST_ACCEPTED &&
-		     ie_cause->value <= GTP_CAUSE_CONTEXT_NOT_FOUND) ||
-		    ie_cause->value == GTP_CAUSE_INVALID_PEER) {
+		if ((ie_cause->value >= GTP2C_CAUSE_REQUEST_ACCEPTED &&
+		     ie_cause->value <= GTP2C_CAUSE_CONTEXT_NOT_FOUND) ||
+		    ie_cause->value == GTP2C_CAUSE_INVALID_PEER) {
 			teid->session->action = GTP_ACTION_DELETE_SESSION;
 		}
 	}
@@ -672,7 +672,7 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
 	if(cp){
 		gtp_ie_serving_network_t* serving_network = (gtp_ie_serving_network_t*) cp;
-		memcpy(s->serving_plmn.plmn,serving_network->mcc_mnc, sizeof(serving_network->mcc_mnc));
+		memcpy(s->serving_plmn.plmn,serving_network->plmn, sizeof(serving_network->plmn));
 		char splmn_s[7];
 		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
 		log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
@@ -799,7 +799,7 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 	oteid = teid->old_teid;
 	ie_cause = (gtp_ie_cause_t *) cp;
-	if (!(ie_cause->value >= GTP_CAUSE_REQUEST_ACCEPTED &&
+	if (!(ie_cause->value >= GTP2C_CAUSE_REQUEST_ACCEPTED &&
 	      ie_cause->value <= 63)) {
 		if (oteid)
 			gtp_sqn_restore(w, oteid->peer_teid);
@@ -922,9 +922,9 @@ gtpc_delete_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
 	if (cp) {
 		ie_cause = (gtp_ie_cause_t *) cp;
-		if (ie_cause->value >= GTP_CAUSE_REQUEST_ACCEPTED &&
-		    ie_cause->value <= GTP_CAUSE_CONTEXT_NOT_FOUND) {
-			if (ie_cause->value == GTP_CAUSE_CONTEXT_NOT_FOUND)
+		if (ie_cause->value >= GTP2C_CAUSE_REQUEST_ACCEPTED &&
+		    ie_cause->value <= GTP2C_CAUSE_CONTEXT_NOT_FOUND) {
+			if (ie_cause->value == GTP2C_CAUSE_CONTEXT_NOT_FOUND)
 				teid->session->action = GTP_ACTION_DELETE_SESSION;
 			gtp_session_destroy_bearer(s);
 		}
@@ -1182,34 +1182,34 @@ static const struct {
 	int direction;	/* GTP_INGRESS : sGW -> pGW | GTP_EGRESS  : pGW -> sGW */
 	gtp_teid_t * (*hdl) (gtp_server_worker_t *, struct sockaddr_storage *, int);
 } gtpc_msg_hdl[0xff + 1] = {
-	[GTP_ECHO_REQUEST_TYPE]			= { GTP_INIT, GTP_INGRESS, gtpc_echo_request_hdl },
-	[GTP_CREATE_SESSION_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_create_session_request_hdl },
-	[GTP_CREATE_SESSION_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_create_session_response_hdl },
-	[GTP_DELETE_SESSION_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_delete_session_request_hdl },
-	[GTP_DELETE_SESSION_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_delete_session_response_hdl },
-	[GTP_MODIFY_BEARER_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_modify_bearer_request_hdl },
-	[GTP_MODIFY_BEARER_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_modify_bearer_response_hdl },
-	[GTP_DELETE_BEARER_REQUEST]		= { GTP_INIT, GTP_EGRESS, gtpc_delete_bearer_request_hdl },
-	[GTP_DELETE_BEARER_RESPONSE]		= { GTP_TRIG, GTP_INGRESS, gtpc_delete_bearer_response_hdl },
+	[GTP2C_ECHO_REQUEST_TYPE]			= { GTP_INIT, GTP_INGRESS, gtpc_echo_request_hdl },
+	[GTP2C_CREATE_SESSION_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_create_session_request_hdl },
+	[GTP2C_CREATE_SESSION_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_create_session_response_hdl },
+	[GTP2C_DELETE_SESSION_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_delete_session_request_hdl },
+	[GTP2C_DELETE_SESSION_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_delete_session_response_hdl },
+	[GTP2C_MODIFY_BEARER_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_modify_bearer_request_hdl },
+	[GTP2C_MODIFY_BEARER_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_modify_bearer_response_hdl },
+	[GTP2C_DELETE_BEARER_REQUEST]		= { GTP_INIT, GTP_EGRESS, gtpc_delete_bearer_request_hdl },
+	[GTP2C_DELETE_BEARER_RESPONSE]		= { GTP_TRIG, GTP_INGRESS, gtpc_delete_bearer_response_hdl },
 	/* Generic command xlat */
-	[GTP_MODIFY_BEARER_COMMAND]		= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_command_hdl },
-	[GTP_DELETE_BEARER_COMMAND]		= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_command_hdl },
-	[GTP_BEARER_RESSOURCE_COMMAND]		= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_command_hdl },
+	[GTP2C_MODIFY_BEARER_COMMAND]		= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_command_hdl },
+	[GTP2C_DELETE_BEARER_COMMAND]		= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_command_hdl },
+	[GTP2C_BEARER_RESSOURCE_COMMAND]	= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_command_hdl },
 	/* Generic request xlat */
-	[GTP_CHANGE_NOTIFICATION_REQUEST]	= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_request_hdl },
-	[GTP_RESUME_NOTIFICATION]		= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_request_hdl },
-	[GTP_CREATE_BEARER_REQUEST]		= { GTP_INIT, GTP_EGRESS, gtpc_generic_xlat_request_hdl },
-	[GTP_UPDATE_BEARER_REQUEST]		= { GTP_INIT, GTP_EGRESS, gtpc_generic_xlat_request_hdl },
-	[GTP_UPDATE_PDN_CONNECTION_SET_REQUEST]	= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_request_hdl },
+	[GTP2C_CHANGE_NOTIFICATION_REQUEST]	= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_request_hdl },
+	[GTP2C_RESUME_NOTIFICATION]		= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_request_hdl },
+	[GTP2C_CREATE_BEARER_REQUEST]		= { GTP_INIT, GTP_EGRESS, gtpc_generic_xlat_request_hdl },
+	[GTP2C_UPDATE_BEARER_REQUEST]		= { GTP_INIT, GTP_EGRESS, gtpc_generic_xlat_request_hdl },
+	[GTP2C_UPDATE_PDN_CONNECTION_SET_REQUEST]	= { GTP_INIT, GTP_INGRESS, gtpc_generic_xlat_request_hdl },
 	/* Generic response xlat */
-	[GTP_CHANGE_NOTIFICATION_RESPONSE]	= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
-	[GTP_RESUME_ACK]			= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
-	[GTP_MODIFY_BEARER_FAILURE_IND]		= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
-	[GTP_DELETE_BEARER_FAILURE_IND]		= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
-	[GTP_BEARER_RESSOURCE_FAILURE_IND]	= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
-	[GTP_CREATE_BEARER_RESPONSE]		= { GTP_TRIG, GTP_INGRESS, gtpc_generic_xlat_response_hdl },
-	[GTP_UPDATE_BEARER_RESPONSE]		= { GTP_TRIG, GTP_INGRESS, gtpc_generic_xlat_response_hdl },
-	[GTP_UPDATE_PDN_CONNECTION_SET_RESPONSE] = { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_CHANGE_NOTIFICATION_RESPONSE]	= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_RESUME_ACK]			= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_MODIFY_BEARER_FAILURE_IND]	= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_DELETE_BEARER_FAILURE_IND]	= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_BEARER_RESSOURCE_FAILURE_IND]	= { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_CREATE_BEARER_RESPONSE]		= { GTP_TRIG, GTP_INGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_UPDATE_BEARER_RESPONSE]		= { GTP_TRIG, GTP_INGRESS, gtpc_generic_xlat_response_hdl },
+	[GTP2C_UPDATE_PDN_CONNECTION_SET_RESPONSE] = { GTP_TRIG, GTP_EGRESS, gtpc_generic_xlat_response_hdl },
 };
 
 gtp_teid_t *
@@ -1219,7 +1219,7 @@ gtpc_switch_handle_v2(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 	gtp_teid_t *teid;
 
 	/* Ignore echo-response messages */
-	if (gtph->type == GTP_ECHO_RESPONSE_TYPE)
+	if (gtph->type == GTP2C_ECHO_RESPONSE_TYPE)
 		return NULL;
 
 	/* Special care to create and delete session */

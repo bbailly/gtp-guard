@@ -37,8 +37,7 @@ typedef struct _gtp_session {
 	uint32_t		ipv4;
 	uint64_t		mei;
 	uint64_t		msisdn;
-	/* original imsi */
-	uint8_t			*imsi;
+	uint8_t			*imsi;		/* original imsi */	
 	uint8_t			ptype;
 
 	gtp_apn_t		*apn;

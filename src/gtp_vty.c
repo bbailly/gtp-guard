@@ -934,6 +934,7 @@ gtp_vty_init(void)
 	install_element(ENABLE_NODE, &gtp_send_echo_request_extended_cmd);
 
 	/* Install other VTY */
+	gtp_stats_vty_init();
 	gtp_pppoe_vty_init();
 	gtp_vrf_vty_init();
 	gtp_apn_vty_init();

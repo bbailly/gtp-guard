@@ -47,10 +47,10 @@ static int
 gtp_dpd_build_gtpu(gtp_iptnl_t *t, uint8_t *buffer)
 {
 	gtp_hdr_t *gtph = (gtp_hdr_t *) buffer;
-	off_t offset = GTPV1U_HEADER_LEN;
+	off_t offset = GTP1U_HEADER_LEN;
 	gtpu_ie_t *ie;
 	gtpu_ie_private_t *priv;
-	uint8_t *payload = buffer + GTPV1U_HEADER_LEN + sizeof(gtpu_ie_t);
+	uint8_t *payload = buffer + GTP1U_HEADER_LEN + sizeof(gtpu_ie_t);
 
 	gtph->version = 2;
 	gtph->piggybacked = 0;
@@ -85,7 +85,7 @@ gtp_dpd_build_udp(gtp_iptnl_t *t, uint8_t *buffer)
 
 	udph->source = htons(GTP_U_PORT);
 	udph->dest = htons(GTP_U_PORT);
-	udph->len = htons(sizeof(struct udphdr) + GTPV1U_HEADER_LEN + t->payload_len);
+	udph->len = htons(sizeof(struct udphdr) + GTP1U_HEADER_LEN + t->payload_len);
 	udph->check = 0;
 
 	return sizeof(struct udphdr);
@@ -100,7 +100,7 @@ gtp_dpd_build_ip(gtp_iptnl_t *t, uint8_t *buffer)
         iph->version = 4;
         /* set tos to internet network control */
         iph->tos = 0xc0;
-        iph->tot_len = (uint16_t)(sizeof(struct iphdr) + sizeof(struct udphdr) + GTPV1U_HEADER_LEN + t->payload_len);
+        iph->tot_len = (uint16_t)(sizeof(struct iphdr) + sizeof(struct udphdr) + GTP1U_HEADER_LEN + t->payload_len);
         iph->tot_len = htons(iph->tot_len);
         iph->id = 0;
         iph->frag_off = 0;
@@ -123,7 +123,7 @@ gtp_dpd_build_ip_encap(gtp_iptnl_t *t, uint8_t *buffer)
         iph->version = 4;
         /* set tos to internet network control */
         iph->tos = 0xc0;
-        iph->tot_len = (uint16_t)(2*sizeof(struct iphdr) + sizeof(struct udphdr) + GTPV1U_HEADER_LEN + t->payload_len);
+        iph->tot_len = (uint16_t)(2*sizeof(struct iphdr) + sizeof(struct udphdr) + GTP1U_HEADER_LEN + t->payload_len);
         iph->tot_len = htons(iph->tot_len);
         iph->id = 0;
         iph->frag_off = 0;

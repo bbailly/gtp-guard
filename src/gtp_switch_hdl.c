@@ -75,11 +75,11 @@ gtpc_retransmit_detected(gtp_server_worker_t *w)
 		return s;
 	}
 
-	cp = gtp1_get_ie(GTP1_IE_TEID_CONTROL_TYPE, w->pbuff);
+	cp = gtp1_get_ie(GTP1C_IE_TEID_CONTROL_TYPE, w->pbuff);
 	if (!cp)
 		return NULL;
 	f_teid.teid_grekey = (uint32_t *) (cp + offsetof(gtp1_ie_teid_t, id));
-	cp = gtp1_get_ie(GTP1_IE_GSN_ADDRESS_TYPE, w->pbuff);
+	cp = gtp1_get_ie(GTP1C_IE_GSN_ADDRESS_TYPE, w->pbuff);
 	if (!cp)
 		return NULL;
 	f_teid.ipv4 = (uint32_t *) (cp + sizeof(gtp1_ie_t));
@@ -178,12 +178,12 @@ gtpu_error_indication_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 	uint8_t *cp;
 
 	/* Data Plane IE */
-	cp = gtp1_get_ie(GTP1_IE_TEID_DATA_TYPE, w->pbuff);
+	cp = gtp1_get_ie(GTP1C_IE_TEID_DATA_TYPE, w->pbuff);
 	if (!cp)
 		return NULL;
 	f_teid.teid_grekey = (uint32_t *) (cp + offsetof(gtp1_ie_teid_t, id));
 
-	cp = gtp1_get_ie(GTP1_IE_GSN_ADDRESS_TYPE, w->pbuff);
+	cp = gtp1_get_ie(GTP1C_IE_GSN_ADDRESS_TYPE, w->pbuff);
 	if (!cp)
 		return NULL;
 	f_teid.ipv4 = (uint32_t *) (cp + sizeof(gtp1_ie_t));

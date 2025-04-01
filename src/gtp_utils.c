@@ -76,9 +76,9 @@ size_t
 gtp1_get_header_len(gtp1_hdr_t *h)
 {
 	if ((h->flags & 0x07) == 0)
-		return GTPV1C_HEADER_LEN_SHORT;
+		return GTP1C_HEADER_LEN_SHORT;
 
-	return GTPV1C_HEADER_LEN_LONG;
+	return GTP1C_HEADER_LEN_LONG;
 }
 
 uint8_t *
@@ -150,7 +150,7 @@ gtpv1_uli_rewrite_geographic_location(gtp_plmn_t* override_plmn, struct sockaddr
 
 
 	memcpy(uli->mcc_mnc, &override_plmn->plmn, sizeof(override_plmn->plmn));
-	uli->geographic_location_type = GTP1_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI;
+	uli->geographic_location_type = GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI;
 	uli->geographic_location.geographic_location_value = ntohl(sgsn_addr->sin_addr.s_addr);
 	log_message(LOG_DEBUG, "%s(): sgw_addr=0x%08x, geographic_location_type=0x%02x, geographic_location_value=0x%08x"
 		, __FUNCTION__
@@ -181,7 +181,7 @@ gtpv1_ie_uli_add(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, pkt_bu
 		, __FUNCTION__);
 
 	/* Find Serving Network IE or RAT TYPE IE to add ULI IE before */
-	cp = gtp1_get_ie(GTP1_IE_QOS_PROFILE_TYPE, buffer);
+	cp = gtp1_get_ie(GTP1C_IE_QOS_PROFILE_TYPE, buffer);
 	if(!cp){
 		log_message(LOG_WARNING, "%s(): Can't add ULI IE because no QoS Profile IE is present !!!"
 			, __FUNCTION__);
@@ -205,7 +205,7 @@ gtpv1_ie_uli_add(gtp_plmn_t* override_plmn, struct sockaddr_in *sgw_addr, pkt_bu
 	buffer->end += delta;
 	gtp1_ie_uli_t uli;
 	uli.h.length = htons(sizeof(gtp1_ie_uli_t) - sizeof(gtp1_ie_t));
-	uli.h.type = GTP1_IE_ULI_TYPE;
+	uli.h.type = GTP1C_IE_ULI_TYPE;
 	memcpy(cp, &uli, sizeof(gtp1_ie_uli_t));
 
 	return gtpv1_uli_rewrite_geographic_location(override_plmn, sgw_addr, (gtp1_ie_uli_t *)cp,buffer) + delta;
@@ -850,7 +850,7 @@ gtp_roaming_status_t gtp_get_roaming_status(uint8_t *imsi, uint8_t *serving_plmn
 ssize_t
 gtpu_get_header_len(pkt_buffer_t *buffer)
 {
-	ssize_t len = GTPV1U_HEADER_LEN;
+	ssize_t len = GTP1U_HEADER_LEN;
 	gtp_hdr_t *gtph = (gtp_hdr_t *) buffer->head;
 	uint8_t *ext_h = NULL;
 
@@ -858,7 +858,7 @@ gtpu_get_header_len(pkt_buffer_t *buffer)
 		return -1;
 
 	if (gtph->flags & GTPU_FL_E) {
-	        len += GTPV1U_EXTENSION_HEADER_LEN;
+	        len += GTP1U_EXTENSION_HEADER_LEN;
 
 		if (pkt_buffer_len(buffer) < len)
 			return -1;
@@ -943,155 +943,171 @@ gtp_flags2str(char *str, size_t str_len, unsigned long flags)
 /*
  *	MSG Types defs
  */
-static const gtp_msg_type_map_t gtpc_msg_type2str[0xff] = {
-	[GTP_ECHO_REQUEST_TYPE] = {
-		.name = "GTP_ECHO_REQUEST_TYPE",
+// static const gtp_msg_type_map_t gtp1c_msg_type2str[0xff] = {
+// 	[GTP1C_ECHO_REQUEST_TYPE] = {
+// 		.name = "GTP1C_ECHO_REQUEST_TYPE",
+// 		.description = "Used to check GTP control-plane connectivity between two nodes."
+// 	},
+// 	[GTP1C_ECHO_RESPONSE_TYPE] = {
+// 		 .name = "GTP1C_ECHO_RESPONSE_TYPE",
+// 		 .description = "Response confirming connectivity to a GTP Echo Request."
+// 	},
+// 	[GTP1C_VERSION_NOT_SUPPORTED_INDICATION_TYPE] = {
+// 		 .name = "GTP1C_VERSION_NOT_SUPPORTED_INDICATION_TYPE",
+// 		 .description = "Indicates that the requested GTP version is not supported."
+// 	},
+// 	[GTP1C_CREATE_PDP_CONTEXT_REQUEST] = {
+// 		.name = "GTP1C_CREATE_PDP_CONTEXT_REQUEST",
+// 		.description = "Requests the creation of a PDP context for a subscriber session."
+// 	},
+// 	[GTP1C_CREATE_PDP_CONTEXT_RESPONSE] = {
+// 		.name = "GTP1C_CREATE_PDP_CONTEXT_RESPONSE",
+// 		.description = "Returns acceptance or rejection of a Create PDP Context Request."
+// 	},
+// 	[GTP1C_UPDATE_PDP_CONTEXT_REQUEST] = {
+// 		.name = "GTP1C_UPDATE_PDP_CONTEXT_REQUEST",
+// 		.description = "Requests modification of an existing PDP context."
+// 	},
+// 	[GTP1C_UPDATE_PDP_CONTEXT_RESPONSE] = {
+// 		.name = "GTP1C_UPDATE_PDP_CONTEXT_RESPONSE",
+// 		.description = "Returns acceptance or rejection of an Update PDP Context Request."
+// 	},
+// 	[GTP1C_DELETE_PDP_CONTEXT_REQUEST] = {
+// 		.name = "GTP1C_DELETE_PDP_CONTEXT_REQUEST",
+// 		.description = "Requests deletion of an existing PDP context."
+// 	},
+// 	[GTP1C_DELETE_PDP_CONTEXT_RESPONSE] = {
+// 		.name = "GTP1C_DELETE_PDP_CONTEXT_RESPONSE",
+// 		.description = "Returns acceptance or rejection of a Delete PDP Context Request."
+// 	},
+// 	/* any non listed records: 0 initialiazed */
+// };
+
+static const gtp_msg_type_map_t gtp2c_msg_type2str[0xff] = {
+	[GTP2C_ECHO_REQUEST_TYPE] = {
+		.name = "GTP2C_ECHO_REQUEST_TYPE",
 		.description = "Used to check GTP control-plane connectivity between two nodes."
 	},
-	[GTP_ECHO_RESPONSE_TYPE] = {
-		 .name = "GTP_ECHO_RESPONSE_TYPE",
+	[GTP2C_ECHO_RESPONSE_TYPE] = {
+		 .name = "GTP2C_ECHO_RESPONSE_TYPE",
 		 .description = "Response confirming connectivity to a GTP Echo Request."
 	},
-	[GTP_VERSION_NOT_SUPPORTED_INDICATION_TYPE] = {
-		 .name = "GTP_VERSION_NOT_SUPPORTED_INDICATION_TYPE",
+	[GTP2C_VERSION_NOT_SUPPORTED_INDICATION_TYPE] = {
+		 .name = "GTP2C_VERSION_NOT_SUPPORTED_INDICATION_TYPE",
 		 .description = "Indicates that the requested GTP version is not supported."
 	},
-	[GTP_CREATE_PDP_CONTEXT_REQUEST] = {
-		.name = "GTP_CREATE_PDP_CONTEXT_REQUEST",
-		.description = "Requests the creation of a PDP context for a subscriber session."
-	},
-	[GTP_CREATE_PDP_CONTEXT_RESPONSE] = {
-		.name = "GTP_CREATE_PDP_CONTEXT_RESPONSE",
-		.description = "Returns acceptance or rejection of a Create PDP Context Request."
-	},
-	[GTP_UPDATE_PDP_CONTEXT_REQUEST] = {
-		.name = "GTP_UPDATE_PDP_CONTEXT_REQUEST",
-		.description = "Requests modification of an existing PDP context."
-	},
-	[GTP_UPDATE_PDP_CONTEXT_RESPONSE] = {
-		.name = "GTP_UPDATE_PDP_CONTEXT_RESPONSE",
-		.description = "Returns acceptance or rejection of an Update PDP Context Request."
-	},
-	[GTP_DELETE_PDP_CONTEXT_REQUEST] = {
-		.name = "GTP_DELETE_PDP_CONTEXT_REQUEST",
-		.description = "Requests deletion of an existing PDP context."
-	},
-	[GTP_DELETE_PDP_CONTEXT_RESPONSE] = {
-		.name = "GTP_DELETE_PDP_CONTEXT_RESPONSE",
-		.description = "Returns acceptance or rejection of a Delete PDP Context Request."
-	},
-	[GTP_CREATE_SESSION_REQUEST_TYPE] = {
-		.name = "GTP_CREATE_SESSION_REQUEST_TYPE",
+	[GTP2C_CREATE_SESSION_REQUEST_TYPE] = {
+		.name = "GTP2C_CREATE_SESSION_REQUEST_TYPE",
 		.description = "Requests establishment of a new session (bearer) in GTPv2."
 	},
-	[GTP_CREATE_SESSION_RESPONSE_TYPE] = {
-		.name = "GTP_CREATE_SESSION_RESPONSE_TYPE",
+	[GTP2C_CREATE_SESSION_RESPONSE_TYPE] = {
+		.name = "GTP2C_CREATE_SESSION_RESPONSE_TYPE",
 		.description = "Returns acceptance or rejection of a Create Session Request."
 	},
-	[GTP_MODIFY_BEARER_REQUEST_TYPE] = {
-		.name = "GTP_MODIFY_BEARER_REQUEST_TYPE",
+	[GTP2C_MODIFY_BEARER_REQUEST_TYPE] = {
+		.name = "GTP2C_MODIFY_BEARER_REQUEST_TYPE",
 		.description = "Requests modification of parameters for an existing bearer."
 	},
-	[GTP_MODIFY_BEARER_RESPONSE_TYPE] = {
-		.name = "GTP_MODIFY_BEARER_RESPONSE_TYPE",
+	[GTP2C_MODIFY_BEARER_RESPONSE_TYPE] = {
+		.name = "GTP2C_MODIFY_BEARER_RESPONSE_TYPE",
 		.description = "Returns acceptance or rejection of a Modify Bearer Request."
 	},
-	[GTP_DELETE_SESSION_REQUEST_TYPE] = {
-		.name = "GTP_DELETE_SESSION_REQUEST_TYPE",
+	[GTP2C_DELETE_SESSION_REQUEST_TYPE] = {
+		.name = "GTP2C_DELETE_SESSION_REQUEST_TYPE",
 		.description = "Requests deletion of a session (bearer)."
 	},
-	[GTP_DELETE_SESSION_RESPONSE_TYPE] = {
-		.name = "GTP_DELETE_SESSION_RESPONSE_TYPE",
+	[GTP2C_DELETE_SESSION_RESPONSE_TYPE] = {
+		.name = "GTP2C_DELETE_SESSION_RESPONSE_TYPE",
 		.description = "Returns acceptance or rejection of a Delete Session Request."
 	},
-	[GTP_CHANGE_NOTIFICATION_REQUEST] = {
-		.name = "GTP_CHANGE_NOTIFICATION_REQUEST",
+	[GTP2C_CHANGE_NOTIFICATION_REQUEST] = {
+		.name = "GTP2C_CHANGE_NOTIFICATION_REQUEST",
 		.description = "Requests a notification regarding changes in user-plane parameters."
 	},
-	[GTP_CHANGE_NOTIFICATION_RESPONSE] = {
-		.name = "GTP_CHANGE_NOTIFICATION_RESPONSE",
+	[GTP2C_CHANGE_NOTIFICATION_RESPONSE] = {
+		.name = "GTP2C_CHANGE_NOTIFICATION_RESPONSE",
 		.description = "Returns acceptance or rejection of a Change Notification Request."
 	},
-	[GTP_REMOTE_UE_REPORT_NOTIFICATION] = {
-		.name = "GTP_REMOTE_UE_REPORT_NOTIFICATION",
+	[GTP2C_REMOTE_UE_REPORT_NOTIFICATION] = {
+		.name = "GTP2C_REMOTE_UE_REPORT_NOTIFICATION",
 		.description = "Notifies about remote UE events or connectivity changes."
 	},
-	[GTP_RESUME_NOTIFICATION] = {
-		.name = "GTP_RESUME_NOTIFICATION",
+	[GTP2C_RESUME_NOTIFICATION] = {
+		.name = "GTP2C_RESUME_NOTIFICATION",
 		.description = "Indicates the resumption of suspended data forwarding or session."
 	},
-	[GTP_RESUME_ACK] = {
-		.name = "GTP_RESUME_ACK",
+	[GTP2C_RESUME_ACK] = {
+		.name = "GTP2C_RESUME_ACK",
 		.description = "Acknowledges receipt of a GTP Resume Notification."
 	},
-	[GTP_MODIFY_BEARER_COMMAND] = {
-		.name = "GTP_MODIFY_BEARER_COMMAND",
+	[GTP2C_MODIFY_BEARER_COMMAND] = {
+		.name = "GTP2C_MODIFY_BEARER_COMMAND",
 		.description = "Instructs modification of a bearer with new parameters."
 	},
-	[GTP_MODIFY_BEARER_FAILURE_IND] = {
-		.name = "GTP_MODIFY_BEARER_FAILURE_IND",
+	[GTP2C_MODIFY_BEARER_FAILURE_IND] = {
+		.name = "GTP2C_MODIFY_BEARER_FAILURE_IND",
 		.description = "Indicates a failure in processing a Modify Bearer Command."
 	},
-	[GTP_DELETE_BEARER_COMMAND] = {
-		.name = "GTP_DELETE_BEARER_COMMAND",
+	[GTP2C_DELETE_BEARER_COMMAND] = {
+		.name = "GTP2C_DELETE_BEARER_COMMAND",
 		.description = "Requests the deletion of a specific bearer."
 	},
-	[GTP_DELETE_BEARER_FAILURE_IND] = {
-		.name = "GTP_DELETE_BEARER_FAILURE_IND",
+	[GTP2C_DELETE_BEARER_FAILURE_IND] = {
+		.name = "GTP2C_DELETE_BEARER_FAILURE_IND",
 		.description = "Indicates a failure in processing a Delete Bearer Command."
 	},
-	[GTP_BEARER_RESSOURCE_COMMAND] = {
-		.name = "GTP_BEARER_RESSOURCE_COMMAND",
+	[GTP2C_BEARER_RESSOURCE_COMMAND] = {
+		.name = "GTP2C_BEARER_RESSOURCE_COMMAND",
 		.description = "Instructs resource allocation or modification for a bearer."
 	},
-	[GTP_BEARER_RESSOURCE_FAILURE_IND] = {
-		.name = "GTP_BEARER_RESSOURCE_FAILURE_IND",
+	[GTP2C_BEARER_RESSOURCE_FAILURE_IND] = {
+		.name = "GTP2C_BEARER_RESSOURCE_FAILURE_IND",
 		.description = "Indicates failure in a bearer resource procedure."
 	},
-	[GTP_CREATE_BEARER_REQUEST] = {
-		.name = "GTP_CREATE_BEARER_REQUEST",
+	[GTP2C_CREATE_BEARER_REQUEST] = {
+		.name = "GTP2C_CREATE_BEARER_REQUEST",
 		.description = "Requests creation of one or more dedicated bearers."
 	},
-	[GTP_CREATE_BEARER_RESPONSE] = {
-		.name = "GTP_CREATE_BEARER_RESPONSE",
+	[GTP2C_CREATE_BEARER_RESPONSE] = {
+		.name = "GTP2C_CREATE_BEARER_RESPONSE",
 		.description = "Returns acceptance or rejection of a Create Bearer Request."
 	},
-	[GTP_UPDATE_BEARER_REQUEST] = {
-		.name = "GTP_UPDATE_BEARER_REQUEST",
+	[GTP2C_UPDATE_BEARER_REQUEST] = {
+		.name = "GTP2C_UPDATE_BEARER_REQUEST",
 		.description = "Requests modification of one or more existing bearers."
 	},
-	[GTP_UPDATE_BEARER_RESPONSE] = {
-		.name = "GTP_UPDATE_BEARER_RESPONSE",
+	[GTP2C_UPDATE_BEARER_RESPONSE] = {
+		.name = "GTP2C_UPDATE_BEARER_RESPONSE",
 		.description = "Returns acceptance or rejection of an Update Bearer Request."
 	},
-	[GTP_DELETE_BEARER_REQUEST] = {
-		.name = "GTP_DELETE_BEARER_REQUEST",
+	[GTP2C_DELETE_BEARER_REQUEST] = {
+		.name = "GTP2C_DELETE_BEARER_REQUEST",
 		.description = "Requests deletion of one or more bearers."
 	},
-	[GTP_DELETE_BEARER_RESPONSE] = {
-		.name = "GTP_DELETE_BEARER_RESPONSE",
+	[GTP2C_DELETE_BEARER_RESPONSE] = {
+		.name = "GTP2C_DELETE_BEARER_RESPONSE",
 		.description = "Returns acceptance or rejection of a Delete Bearer Request."
 	},
-	[GTP_DELETE_PDN_CONNECTION_SET_REQUEST] = {
-		.name = "GTP_DELETE_PDN_CONNECTION_SET_REQUEST",
+	[GTP2C_DELETE_PDN_CONNECTION_SET_REQUEST] = {
+		.name = "GTP2C_DELETE_PDN_CONNECTION_SET_REQUEST",
 		.description = "Requests deletion of PDN connections associated with a user."
 	},
-	[GTP_SUSPEND_NOTIFICATION] = {
-		.name = "GTP_SUSPEND_NOTIFICATION",
+	[GTP2C_SUSPEND_NOTIFICATION] = {
+		.name = "GTP2C_SUSPEND_NOTIFICATION",
 		.description = "Indicates the suspension of a PDN connection or bearer."
 	},
-	[GTP_UPDATE_PDN_CONNECTION_SET_REQUEST] = {
-		.name = "GTP_UPDATE_PDN_CONNECTION_SET_REQUEST",
+	[GTP2C_UPDATE_PDN_CONNECTION_SET_REQUEST] = {
+		.name = "GTP2C_UPDATE_PDN_CONNECTION_SET_REQUEST",
 		.description = "Requests updating PDN connections associated with a user."
 	},
-	[GTP_UPDATE_PDN_CONNECTION_SET_RESPONSE] = {
-		.name = "GTP_UPDATE_PDN_CONNECTION_SET_RESPONSE",
+	[GTP2C_UPDATE_PDN_CONNECTION_SET_RESPONSE] = {
+		.name = "GTP2C_UPDATE_PDN_CONNECTION_SET_RESPONSE",
 		.description = "Returns acceptance or rejection of an Update PDN Connection Set Request."
 	},
 	/* any non listed records: 0 initialiazed */
 };
 
-static const gtp_msg_type_map_t gtpu_msg_type2str[256] = {
+static const gtp_msg_type_map_t gtp1u_msg_type2str[256] = {
 	[GTPU_ECHO_REQ_TYPE] = {
 		.name = "GTPU_ECHO_REQ_TYPE",
 		.description = "Used to verify path connectivity in GTP-U (Echo Request)."
@@ -1125,9 +1141,9 @@ gtp_msgtype2str(int type, int idx)
 	const gtp_msg_type_map_t *msg_type2str = NULL;
 
 	if (type == GTP_FL_CTL_BIT)
-		msg_type2str = gtpc_msg_type2str;
+		msg_type2str = gtp2c_msg_type2str;
 	else if (type == GTP_FL_UPF_BIT)
-		msg_type2str = gtpu_msg_type2str;
+		msg_type2str = gtp1u_msg_type2str;
 
 	if (!msg_type2str)
 		return "null";
@@ -1141,76 +1157,90 @@ gtp_msgtype2str(int type, int idx)
 /*
  *	Cause defs
  */
-static const gtp_msg_type_map_t gtpc_msg_cause2str[0xff] = {
-	[GTP_CAUSE_REQUEST_ACCEPTED] = {
-		.name = "GTP_CAUSE_REQUEST_ACCEPTED",
-		.description = "Cause: request accepted by the receiving node."
-	},
-	[GTP_CAUSE_CONTEXT_NOT_FOUND] = {
-		.name = "GTP_CAUSE_CONTEXT_NOT_FOUND",
-		.description = "Cause: session or context not found for the request."
-	},
-	[GTP_CAUSE_MISSING_OR_UNKNOWN_APN] = {
-		.name = "GTP_CAUSE_MISSING_OR_UNKNOWN_APN",
-		.description = "Cause: the APN is missing or not recognized by the network."
-	},
-	[GTP_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED] = {
-		.name = "GTP_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED",
-		.description = "Cause: no free IP addresses left to assign (all in use)."
-	},
-	[GTP_CAUSE_USER_AUTH_FAILED] = {
-		.name = "GTP_CAUSE_USER_AUTH_FAILED",
-		.description = "Cause: user authentication procedure failed."
-	},
-	[GTP_CAUSE_APN_ACCESS_DENIED] = {
-		.name = "GTP_CAUSE_APN_ACCESS_DENIED",
-		.description = "Cause: access to the requested APN is denied."
-	},
-	[GTP_CAUSE_REQUEST_REJECTED] = {
-		.name = "GTP_CAUSE_REQUEST_REJECTED",
-		.description = "Cause: the request was rejected (general failure)."
-	},
-	[GTP_CAUSE_IMSI_IMEI_NOT_KNOWN] = {
-		.name = "GTP_CAUSE_IMSI_IMEI_NOT_KNOWN",
-		.description = "Cause: the IMSI or IMEI is not recognized by the network."
-	},
-	[GTP_CAUSE_INVALID_PEER] = {
-		.name = "GTP_CAUSE_INVALID_PEER",
-		.description = "Cause: the peer node is invalid or not allowed."
-	},
-	[GTP_CAUSE_APN_CONGESTION] = {
-		.name = "GTP_CAUSE_APN_CONGESTION",
-		.description = "Cause: the APN is congested."
-	},
-	[GTP_CAUSE_MULTIPLE_PDN_NOT_ALLOWED] = {
-		.name = "GTP_CAUSE_MULTIPLE_PDN_NOT_ALLOWED",
-		.description = "Cause: subscriber restricted to a single PDN connection."
-	},
-	[GTP_CAUSE_TIMED_OUT_REQUEST] = {
-		.name = "GTP_CAUSE_TIMED_OUT_REQUEST",
-		.description = "Cause: no response before the request timed out."
-	},
-	[GTP_CAUSE_5GC_NOT_ALLOWED] = {
-		.name = "GTP_CAUSE_5GC_NOT_ALLOWED",
-		.description = "Cause: requested 5G Core functionality not allowed."
-	},
-	[GTP1_CAUSE_REQUEST_ACCEPTED] = {
-		.name = "GTP1_CAUSE_REQUEST_ACCEPTED",
+static const gtp_msg_type_map_t gtp1c_msg_cause2str[0xff] = {
+	[GTP1C_CAUSE_REQUEST_ACCEPTED] = {
+		.name = "GTP1C_CAUSE_REQUEST_ACCEPTED",
 		.description = "Cause (GTPv1): request accepted by the receiving node."
 	},
-	[GTP1_CAUSE_NON_EXISTENT] = {
-		.name = "GTP1_CAUSE_NON_EXISTENT",
+	[GTP1C_CAUSE_NON_EXISTENT] = {
+		.name = "GTP1C_CAUSE_NON_EXISTENT",
 		.description = "Cause (GTPv1): requested resource or context doesn't exist."
+	},
+	/* any non listed records: 0 initialiazed */
+};
+
+static const gtp_msg_type_map_t gtp2c_msg_cause2str[0xff] = {
+	[GTP2C_CAUSE_REQUEST_ACCEPTED] = {
+		.name = "GTP2C_CAUSE_REQUEST_ACCEPTED",
+		.description = "Cause: request accepted by the receiving node."
+	},
+	[GTP2C_CAUSE_CONTEXT_NOT_FOUND] = {
+		.name = "GTP2C_CAUSE_CONTEXT_NOT_FOUND",
+		.description = "Cause: session or context not found for the request."
+	},
+	[GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN] = {
+		.name = "GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN",
+		.description = "Cause: the APN is missing or not recognized by the network."
+	},
+	[GTP2C_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED] = {
+		.name = "GTP2C_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED",
+		.description = "Cause: no free IP addresses left to assign (all in use)."
+	},
+	[GTP2C_CAUSE_USER_AUTH_FAILED] = {
+		.name = "GTP2C_CAUSE_USER_AUTH_FAILED",
+		.description = "Cause: user authentication procedure failed."
+	},
+	[GTP2C_CAUSE_APN_ACCESS_DENIED] = {
+		.name = "GTP2C_CAUSE_APN_ACCESS_DENIED",
+		.description = "Cause: access to the requested APN is denied."
+	},
+	[GTP2C_CAUSE_REQUEST_REJECTED] = {
+		.name = "GTP2C_CAUSE_REQUEST_REJECTED",
+		.description = "Cause: the request was rejected (general failure)."
+	},
+	[GTP2C_CAUSE_IMSI_IMEI_NOT_KNOWN] = {
+		.name = "GTP2C_CAUSE_IMSI_IMEI_NOT_KNOWN",
+		.description = "Cause: the IMSI or IMEI is not recognized by the network."
+	},
+	[GTP2C_CAUSE_INVALID_PEER] = {
+		.name = "GTP2C_CAUSE_INVALID_PEER",
+		.description = "Cause: the peer node is invalid or not allowed."
+	},
+	[GTP2C_CAUSE_APN_CONGESTION] = {
+		.name = "GTP2C_CAUSE_APN_CONGESTION",
+		.description = "Cause: the APN is congested."
+	},
+	[GTP2C_CAUSE_MULTIPLE_PDN_NOT_ALLOWED] = {
+		.name = "GTP2C_CAUSE_MULTIPLE_PDN_NOT_ALLOWED",
+		.description = "Cause: subscriber restricted to a single PDN connection."
+	},
+	[GTP2C_CAUSE_TIMED_OUT_REQUEST] = {
+		.name = "GTP2C_CAUSE_TIMED_OUT_REQUEST",
+		.description = "Cause: no response before the request timed out."
+	},
+	[GTP2C_CAUSE_5GC_NOT_ALLOWED] = {
+		.name = "GTP2C_CAUSE_5GC_NOT_ALLOWED",
+		.description = "Cause: requested 5G Core functionality not allowed."
 	},
 	/* any non listed records: 0 initialiazed */
 };
 
 
 const char *
-gtpc_cause2str(int idx)
+gtp2c_cause2str(int idx)
 {
-	if (gtpc_msg_cause2str[idx].name)
-		return gtpc_msg_cause2str[idx].name;
+	if (gtp2c_msg_cause2str[idx].name)
+		return gtp2c_msg_cause2str[idx].name;
 
 	return "bad cause";
 }
+
+const char *
+gtp1c_cause2str(int idx)
+{
+	if (gtp1c_msg_cause2str[idx].name)
+		return gtp1c_msg_cause2str[idx].name;
+
+	return "bad cause";
+}
+

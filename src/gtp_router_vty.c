@@ -228,17 +228,17 @@ static int
 vty_server_worker(gtp_server_worker_t *w, void *arg)
 {
 	vty_t *vty = arg;
-	gtp_server_t *srv = w->srv;
-	char flags2str[BUFSIZ];
+/* 	gtp_server_t *srv = w->srv;
+ */	char flags2str[BUFSIZ];
 	char fdpath[PATH_MAX];
-	int i, type = -1;
-
+/* 	int i, type = -1;
+ */
 	/* Can only be GTP-C OR GTP-U */
-	if (__test_bit(GTP_FL_CTL_BIT, &srv->flags))
+/* 	if (__test_bit(GTP_FL_CTL_BIT, &srv->flags))
 		type = GTP_FL_CTL_BIT;
 	else if (__test_bit(GTP_FL_UPF_BIT, &srv->flags))
 		type = GTP_FL_UPF_BIT;
-
+ */
 	vty_out(vty, "   %s worker:#%.2d task:0x%lx fd:%d(%s)%s"
 		     "    flags:%s%s"
 		     "    seed:%d pbuff:%p (len:%d size:%d bytes)%s"
@@ -258,7 +258,7 @@ vty_server_worker(gtp_server_worker_t *w, void *arg)
 		   , VTY_NEWLINE);
 
 	vty_out(vty, "    RX:%s", VTY_NEWLINE);
-	for (i = 0; i < ARRAY_SIZE(w->msg_stats.rx); i++) {
+/* 	for (i = 0; i < ARRAY_SIZE(w->msg_stats.rx); i++) {
 		if (w->msg_stats.rx[i].count)
 			vty_out(vty, "     %s(%d): %d%s"
 				   , gtp_msgtype2str(type, i)
@@ -304,7 +304,7 @@ vty_server_worker(gtp_server_worker_t *w, void *arg)
 				   , w->cause_stats.tx[i].count
 				   , VTY_NEWLINE);
 	}
-
+ */
 	return CMD_SUCCESS;
 }
 

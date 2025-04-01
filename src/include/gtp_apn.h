@@ -83,7 +83,7 @@ typedef struct _gtp_rewrite_rule {
 } gtp_rewrite_rule_t;
 
 typedef struct _gtp_plmn {
-	uint8_t plmn[3];
+	plmn_t			plmn;
 
 	list_head_t		next;
 } gtp_plmn_t;

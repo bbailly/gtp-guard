@@ -52,6 +52,7 @@
 #include "gtp_teid.h"
 #include "gtp_iptnl.h"
 #include "gtp_conn.h"
+#include "gtp_stats.h"
 #include "gtp_server.h"
 #include "gtp_pppoe.h"
 #include "gtp_pppoe_session.h"
@@ -85,6 +86,5 @@
 #include "gtp_msg.h"
 #include "gtp_vty.h"
 #include "gtp_cmd.h"
-
 
 #endif

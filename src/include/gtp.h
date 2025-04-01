@@ -41,7 +41,7 @@ enum gtp_flags {
 };
 
 /* Roaming Status */
-typedef enum gtp_roaming_status {
+typedef enum _gtp_roaming_status {
 	GTP_ROAMING_STATUS_HPLMN,
 	GTP_ROAMING_STATUS_ROAMING_IN,
 	GTP_ROAMING_STATUS_ROAMING_OUT,
@@ -49,11 +49,11 @@ typedef enum gtp_roaming_status {
 
 /* default values */
 #define GTP_MAX_PACKET_SIZE		4096
-#define GTPV1C_HEADER_LEN_SHORT		8
-#define GTPV1C_HEADER_LEN_LONG		12
-#define GTPV1U_HEADER_LEN		8
-#define GTPV1U_EXTENSION_HEADER_LEN	4
-#define GTPV2C_HEADER_LEN		12
+#define GTP1C_HEADER_LEN_SHORT		8
+#define GTP1C_HEADER_LEN_LONG		12
+#define GTP1U_HEADER_LEN		8
+#define GTP1U_EXTENSION_HEADER_LEN	4
+#define GTP2C_HEADER_LEN		12
 #define GTP_TEID_LEN			4
 #define GTP_C_PORT			2123
 #define GTP_U_PORT			2152
@@ -62,60 +62,68 @@ typedef enum gtp_roaming_status {
 #define GTP_INIT			(1 << 0)
 #define GTP_TRIG			(1 << 2)
 
-/* GTP-C Message Type */
-#define GTP_ECHO_REQUEST_TYPE				1
-#define GTP_ECHO_RESPONSE_TYPE				2
-#define GTP_VERSION_NOT_SUPPORTED_INDICATION_TYPE	3
-#define GTP_CREATE_PDP_CONTEXT_REQUEST			16
-#define GTP_CREATE_PDP_CONTEXT_RESPONSE			17
-#define GTP_UPDATE_PDP_CONTEXT_REQUEST			18
-#define GTP_UPDATE_PDP_CONTEXT_RESPONSE			19
-#define GTP_DELETE_PDP_CONTEXT_REQUEST			20
-#define GTP_DELETE_PDP_CONTEXT_RESPONSE			21
-#define GTP_CREATE_SESSION_REQUEST_TYPE			32
-#define GTP_CREATE_SESSION_RESPONSE_TYPE		33
-#define GTP_MODIFY_BEARER_REQUEST_TYPE			34
-#define GTP_MODIFY_BEARER_RESPONSE_TYPE			35
-#define GTP_DELETE_SESSION_REQUEST_TYPE			36
-#define GTP_DELETE_SESSION_RESPONSE_TYPE		37
-#define GTP_CHANGE_NOTIFICATION_REQUEST			38
-#define GTP_CHANGE_NOTIFICATION_RESPONSE		39
-#define GTP_REMOTE_UE_REPORT_NOTIFICATION		40
-#define GTP_RESUME_NOTIFICATION				164
-#define GTP_RESUME_ACK					165
-#define GTP_MODIFY_BEARER_COMMAND			64
-#define GTP_MODIFY_BEARER_FAILURE_IND			65
-#define GTP_DELETE_BEARER_COMMAND			66
-#define GTP_DELETE_BEARER_FAILURE_IND			67
-#define GTP_BEARER_RESSOURCE_COMMAND			68
-#define GTP_BEARER_RESSOURCE_FAILURE_IND		69
-#define GTP_CREATE_BEARER_REQUEST			95
-#define GTP_CREATE_BEARER_RESPONSE			96
-#define GTP_UPDATE_BEARER_REQUEST			97
-#define GTP_UPDATE_BEARER_RESPONSE			98
-#define GTP_DELETE_BEARER_REQUEST			99
-#define GTP_DELETE_BEARER_RESPONSE			100
-#define GTP_DELETE_PDN_CONNECTION_SET_REQUEST		101
-#define GTP_SUSPEND_NOTIFICATION			162
-#define GTP_UPDATE_PDN_CONNECTION_SET_REQUEST		200
-#define GTP_UPDATE_PDN_CONNECTION_SET_RESPONSE		201
+/* GTP-C v1 Message Type */
+#define GTP1C_ECHO_REQUEST_TYPE				1
+#define GTP1C_ECHO_RESPONSE_TYPE				2
+#define GTP1C_VERSION_NOT_SUPPORTED_INDICATION_TYPE	3
+#define GTP1C_CREATE_PDP_CONTEXT_REQUEST			16
+#define GTP1C_CREATE_PDP_CONTEXT_RESPONSE			17
+#define GTP1C_UPDATE_PDP_CONTEXT_REQUEST			18
+#define GTP1C_UPDATE_PDP_CONTEXT_RESPONSE			19
+#define GTP1C_DELETE_PDP_CONTEXT_REQUEST			20
+#define GTP1C_DELETE_PDP_CONTEXT_RESPONSE			21
 
-/* GTP-C Cause */
-#define GTP_CAUSE_REQUEST_ACCEPTED			16
-#define GTP_CAUSE_CONTEXT_NOT_FOUND			64
-#define GTP_CAUSE_MISSING_OR_UNKNOWN_APN		78
-#define GTP_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED		84
-#define GTP_CAUSE_USER_AUTH_FAILED			92
-#define GTP_CAUSE_APN_ACCESS_DENIED			93
-#define GTP_CAUSE_REQUEST_REJECTED			94
-#define GTP_CAUSE_IMSI_IMEI_NOT_KNOWN			96
-#define GTP_CAUSE_INVALID_PEER				109
-#define GTP_CAUSE_APN_CONGESTION			113
-#define GTP_CAUSE_MULTIPLE_PDN_NOT_ALLOWED		116
-#define GTP_CAUSE_TIMED_OUT_REQUEST			122
-#define GTP_CAUSE_5GC_NOT_ALLOWED			129
-#define GTP1_CAUSE_REQUEST_ACCEPTED			128
-#define GTP1_CAUSE_NON_EXISTENT				192
+/* GTP-C v2 Message Type */
+#define GTP2C_ECHO_REQUEST_TYPE				1
+#define GTP2C_ECHO_RESPONSE_TYPE				2
+#define GTP2C_VERSION_NOT_SUPPORTED_INDICATION_TYPE	3
+#define GTP2C_CREATE_SESSION_REQUEST_TYPE			32
+#define GTP2C_CREATE_SESSION_RESPONSE_TYPE		33
+#define GTP2C_MODIFY_BEARER_REQUEST_TYPE			34
+#define GTP2C_MODIFY_BEARER_RESPONSE_TYPE			35
+#define GTP2C_DELETE_SESSION_REQUEST_TYPE			36
+#define GTP2C_DELETE_SESSION_RESPONSE_TYPE		37
+#define GTP2C_CHANGE_NOTIFICATION_REQUEST			38
+#define GTP2C_CHANGE_NOTIFICATION_RESPONSE		39
+#define GTP2C_REMOTE_UE_REPORT_NOTIFICATION		40
+#define GTP2C_RESUME_NOTIFICATION				164
+#define GTP2C_RESUME_ACK					165
+#define GTP2C_MODIFY_BEARER_COMMAND			64
+#define GTP2C_MODIFY_BEARER_FAILURE_IND			65
+#define GTP2C_DELETE_BEARER_COMMAND			66
+#define GTP2C_DELETE_BEARER_FAILURE_IND			67
+#define GTP2C_BEARER_RESSOURCE_COMMAND			68
+#define GTP2C_BEARER_RESSOURCE_FAILURE_IND		69
+#define GTP2C_CREATE_BEARER_REQUEST			95
+#define GTP2C_CREATE_BEARER_RESPONSE			96
+#define GTP2C_UPDATE_BEARER_REQUEST			97
+#define GTP2C_UPDATE_BEARER_RESPONSE			98
+#define GTP2C_DELETE_BEARER_REQUEST			99
+#define GTP2C_DELETE_BEARER_RESPONSE			100
+#define GTP2C_DELETE_PDN_CONNECTION_SET_REQUEST		101
+#define GTP2C_SUSPEND_NOTIFICATION			162
+#define GTP2C_UPDATE_PDN_CONNECTION_SET_REQUEST		200
+#define GTP2C_UPDATE_PDN_CONNECTION_SET_RESPONSE		201
+
+/* GTP-C v1 Cause */
+#define GTP1C_CAUSE_REQUEST_ACCEPTED			128
+#define GTP1C_CAUSE_NON_EXISTENT				192
+
+
+/* GTP-C v2 Cause */
+#define GTP2C_CAUSE_REQUEST_ACCEPTED			16
+#define GTP2C_CAUSE_CONTEXT_NOT_FOUND			64
+#define GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN		78
+#define GTP2C_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED		84
+#define GTP2C_CAUSE_USER_AUTH_FAILED			92
+#define GTP2C_CAUSE_APN_ACCESS_DENIED			93
+#define GTP2C_CAUSE_REQUEST_REJECTED			94
+#define GTP2C_CAUSE_IMSI_IMEI_NOT_KNOWN			96
+#define GTP2C_CAUSE_INVALID_PEER				109
+#define GTP2C_CAUSE_APN_CONGESTION			113
+#define GTP2C_CAUSE_MULTIPLE_PDN_NOT_ALLOWED		116
+#define GTP2C_CAUSE_TIMED_OUT_REQUEST			122
+#define GTP2C_CAUSE_5GC_NOT_ALLOWED			129
 
 /* GTP-C PDN Type */
 #define GTP_FL_PDN_IPV4					(1 << 0)
@@ -136,27 +144,29 @@ typedef enum gtp_roaming_status {
 #define GTPU_FL_PT					(1 << 4)
 #define GTPU_FL_V					(1 << 5)
 
+typedef uint8_t plmn_t[3];
+
 /*
- *	GTPv1 IE
+ *	GTP1 IE
  */
 typedef struct _gtp1_ie {
 	uint8_t		type;
 	uint16_t	length;
 } __attribute__((packed)) gtp1_ie_t;
 
-#define GTP1_IE_CAUSE_TYPE				1
+#define GTP1C_IE_CAUSE_TYPE				1
 typedef struct _gtp1_ie_cause {
 	uint8_t		type;
 	uint8_t		value;
 } __attribute__((packed)) gtp1_ie_cause_t;
 
-#define GTP1_IE_IMSI_TYPE				2
+#define GTP1C_IE_IMSI_TYPE				2
 typedef struct _gtp1_ie_imsi {
 	uint8_t		type;
 	uint8_t		imsi[8];
 } __attribute__((packed)) gtp1_ie_imsi_t;
 
-#define GTP1_IE_RAI_TYPE				3
+#define GTP1C_IE_RAI_TYPE				3
 typedef struct _gtp1_ie_rai {
 	uint8_t		type;
 	uint8_t		plmn[3];
@@ -170,36 +180,36 @@ typedef struct _gtp1_ie_recovery {
 	uint8_t		recovery;
 } __attribute__((packed)) gtp1_ie_recovery_t;
 
-#define GTP1_IE_TEID_DATA_TYPE				16
-#define GTP1_IE_TEID_CONTROL_TYPE			17
+#define GTP1C_IE_TEID_DATA_TYPE				16
+#define GTP1C_IE_TEID_CONTROL_TYPE			17
 typedef struct _gtp1_ie_teid {
 	uint8_t		type;
 	uint32_t	id;
 } __attribute__((packed)) gtp1_ie_teid_t;
 
-#define GTP1_IE_APN_TYPE				131
+#define GTP1C_IE_APN_TYPE				131
 typedef struct _gtp1_ie_apn {
 	gtp1_ie_t	h;
 	uint8_t		apn[64];
 } __attribute__((packed)) gtp1_ie_apn_t;
 
-#define GTP1_IE_GSN_ADDRESS_TYPE			133
+#define GTP1C_IE_GSN_ADDRESS_TYPE			133
 typedef struct _gtp1_ie_gsn_address {
 	gtp1_ie_t	h;
 	uint32_t	ipv4;
 } __attribute__((packed)) gtp1_ie_gsn_address_t;
 
-#define GTP1_IE_QOS_PROFILE_TYPE			135
+#define GTP1C_IE_QOS_PROFILE_TYPE			135
 typedef struct _gtp1_ie_qos_profile {
 	gtp1_ie_t	h;
 	uint8_t		arp;
 } __attribute__((packed)) gtp1_ie_qos_profile_t;
 
 
-#define GTP1_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI	0
-#define GTP1_ULI_GEOGRAPHIC_LOCATION_TYPE_SAI	1
-#define GTP1_ULI_GEOGRAPHIC_LOCATION_TYPE_RAI	2
-#define GTP1_IE_ULI_TYPE			152
+#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_CGI	0
+#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_SAI	1
+#define GTP1C_ULI_GEOGRAPHIC_LOCATION_TYPE_RAI	2
+#define GTP1C_IE_ULI_TYPE			152
 typedef struct _gtp1_ie_uli {
 	gtp1_ie_t	h;
 	uint8_t	geographic_location_type;
@@ -224,7 +234,7 @@ typedef struct _gtp1_ie_uli {
 
 
 /*
- *	GTPv2 IE
+ *	GTP2C IE
  */
 typedef struct _gtpu_ie {
 	uint8_t		type;
@@ -394,7 +404,7 @@ typedef struct _gtp_ie_rat_type {
 #define GTP_IE_SERVING_NETWORK_TYPE		83
 typedef struct _gtp_ie_serving_network {
 	gtp_ie_t	h;
-	uint8_t		mcc_mnc[3];
+	plmn_t		plmn;
 } __attribute__((packed)) gtp_ie_serving_network_t;
 
 #define GTP_IE_ULI_TYPE			86
