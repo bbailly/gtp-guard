@@ -408,11 +408,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 			gtp_session_destroy(s);
 			teid = NULL;
 		}else{
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
-			log_message(LOG_INFO, "%s(): increase counter for create session request (worker %d (%p), %hhu, %02hhx%02hhx%02hhx, %u.%u.%u.%u, version=%hhu)"
-				, __FUNCTION__
-				, w->id, w, h->type, s->serving_plmn.plmn[0], s->serving_plmn.plmn[1], s->serving_plmn.plmn[2], NIPQUAD(((struct sockaddr_in*)addr)->sin_addr), h->version);
-	
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);	
 		}
 
 		goto end;
@@ -537,9 +533,6 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 			teid->session->action = GTP_ACTION_DELETE_SESSION;
 		}
 		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
-		log_message(LOG_INFO, "%s(): increase counter for create session response (worker %d (%p), %hhu, %02hhx%02hhx%02hhx, %u.%u.%u.%u, version=%hhu)"
-			, __FUNCTION__
-			, w->id, w, h->type, teid->session->apn->plmn.plmn[0], teid->session->apn->plmn.plmn[1], teid->session->apn->plmn.plmn[2], NIPQUAD(((struct sockaddr_in*)addr)->sin_addr), h->version);
 	}else{
 		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
 	}
@@ -886,10 +879,6 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* Recovery xlat */
 	gtpc_session_xlat_recovery(w);
 
-	/* If binding already exist then bearer update already done */
-	if (teid->peer_teid)
-		goto end;
-
 	/* Test cause code, destroy if <> success.
 	 * 3GPP.TS.29.274 8.4 */
 	cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
@@ -899,9 +888,16 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 		return teid;
 	}
+	ie_cause = (gtp_ie_cause_t *) cp;
+
+	/* If binding already exist then bearer update already done */
+	if (teid->peer_teid){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
+		goto end;
+	}
 
 	oteid = teid->old_teid;
-	ie_cause = (gtp_ie_cause_t *) cp;
 	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
 
 	if (!(ie_cause->value >= GTP2C_CAUSE_REQUEST_ACCEPTED &&

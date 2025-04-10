@@ -173,17 +173,7 @@ void __gtp_stats_gtp_inc_counter(gtp_gtp_stats_t *stats, uint8_t version, direct
 		}
 	}else if(version == 2){
 		if(direction == dir_rx){
-			log_message(LOG_INFO, "%s(): stats_v2_rx at %p"
-				, __FUNCTION__
-				, &stats->v2_rx);
-			log_message(LOG_INFO, "%s(): increase counter for message type %hhu at %p (%hhu, %s, version=%hhu) before %lu"
-				, __FUNCTION__
-				, message_type, &stats->v2_rx[message_type], message_type, direction == dir_rx?"rx":"tx", version, stats->v2_rx[message_type].counter);
 			stats->v2_rx[message_type].counter++;
-			log_message(LOG_INFO, "%s(): increase counter for message type %hhu at %p (%hhu, %s, version=%hhu) after %lu"
-				, __FUNCTION__
-				, message_type, &stats->v2_rx[message_type], message_type, direction == dir_rx?"rx":"tx", version, stats->v2_rx[message_type].counter);
-
 		}else{
 			stats->v2_tx[message_type].counter++;
 		}
@@ -200,10 +190,6 @@ void gtp_stats_gtp_signalling_inc_counter(gtp_server_stats_t *server_stats, uint
 	gtp_ip_stats_t *ip_stats = NULL;
 	uint32_t plmn_hash = 0;
 	uint32_t ip_hash;
-
-	log_message(LOG_INFO, "%s(): increase counter for message type %hhu (%hhu, %s, %02hhx%02hhx%02hhx, %u.%u.%u.%u, version=%hhu)"
-		, __FUNCTION__
-		, message_type, message_type, direction == dir_rx?"rx":"tx", peer_plmn[0], peer_plmn[1], peer_plmn[2], NIPQUAD(((struct sockaddr_in*)peer_ip)->sin_addr), version);
 
 	__gtp_stats_gtp_signalling_inc_counter((gtp_gtp_stats_t *)server_stats->signalling_gtp, version, direction, message_type, cause);
 
@@ -242,21 +228,73 @@ void __gtp_sum_stats(gtp_stats_t sum[], gtp_stats_t src[], uint8_t length){
 	}
 }
 
+
+
+void __gtp_stats_show_gtp_server(gtp_server_t *srv, uint8_t *plmn, gtp_htab_t *tmp_plmns, gtp_htab_t *tmp_ips, gtp_stats_t *stats_v1_rx, gtp_stats_t *stats_v1_tx, gtp_stats_t *stats_v2_rx, gtp_stats_t *stats_v2_tx){
+	gtp_server_worker_t *worker, *w_tmp;
+	gtp_plmn_stats_t *plmn_stats;
+	gtp_ip_stats_t *ip_stats;
+	gtp_plmn_stats_t *tmp_plmn_stats;
+	gtp_ip_stats_t *tmp_ip_stats;
+	struct hlist_node *n, *hl_tmp;
+
+
+
+
+	list_for_each_entry_safe(worker, w_tmp, &srv->workers, next){
+		if(plmn){
+			struct hlist_head *plmn_stats_head;
+			plmn_stats_head = gtp_stats_plmn_hashkey(worker->stats.signalling_gtp->plmns, plmn);
+
+			hlist_for_each_entry_safe(plmn_stats, hl_tmp, n, plmn_stats_head, hlist){
+				if(memcmp(plmn_stats->plmn, plmn, sizeof(plmn_t))){
+					continue;
+				}
+				__gtp_sum_stats(stats_v1_rx, plmn_stats->v1_rx, 0xff);
+				__gtp_sum_stats(stats_v1_tx, plmn_stats->v1_tx, 0xff);
+				__gtp_sum_stats(stats_v2_rx, plmn_stats->v2_rx, 0xff);
+				__gtp_sum_stats(stats_v2_tx, plmn_stats->v2_tx, 0xff);
+
+				for (int i = 0; i < STATS_GTP_IP_HASHTAB_SIZE; i++) {
+					hlist_for_each_entry_safe(ip_stats, hl_tmp, n, &plmn_stats->peers->htab[i], hlist){
+						tmp_ip_stats = __gtp_stats_ip_hash(tmp_ips, ip_stats->ip);
+						__gtp_sum_stats(tmp_ip_stats->v1_rx, ip_stats->v1_rx, 0xff);
+						__gtp_sum_stats(tmp_ip_stats->v1_tx, ip_stats->v1_tx, 0xff);
+						__gtp_sum_stats(tmp_ip_stats->v2_rx, ip_stats->v2_rx, 0xff);
+						__gtp_sum_stats(tmp_ip_stats->v2_tx, ip_stats->v2_tx, 0xff);
+					}
+				}
+			}
+		}else{
+			__gtp_sum_stats(stats_v1_rx, worker->stats.signalling_gtp->v1_rx, 0xff);
+			__gtp_sum_stats(stats_v1_tx, worker->stats.signalling_gtp->v1_tx, 0xff);
+			__gtp_sum_stats(stats_v2_rx, worker->stats.signalling_gtp->v2_rx, 0xff);
+			__gtp_sum_stats(stats_v2_tx, worker->stats.signalling_gtp->v2_tx, 0xff);
+			for (int i = 0; i < STATS_GTP_PLMN_HASHTAB_SIZE; i++) {
+				hlist_for_each_entry_safe(plmn_stats, hl_tmp, n, &worker->stats.signalling_gtp->plmns->htab[i], hlist){
+					tmp_plmn_stats = __gtp_stats_plmn_hash(tmp_plmns, plmn_stats->plmn);
+					__gtp_sum_stats(tmp_plmn_stats->v1_rx, plmn_stats->v1_rx, 0xff);
+					__gtp_sum_stats(tmp_plmn_stats->v1_tx, plmn_stats->v1_tx, 0xff);
+					__gtp_sum_stats(tmp_plmn_stats->v2_rx, plmn_stats->v2_rx, 0xff);
+					__gtp_sum_stats(tmp_plmn_stats->v2_tx, plmn_stats->v2_tx, 0xff);
+
+				}
+			}
+		}
+	}
+}
+
 static int
-gtp_stats_show(vty_t *vty, plmn_t plmn)
+gtp_stats_show(vty_t *vty, uint8_t *plmn)
 {
 	const list_head_t *l = &daemon_data->gtp_switch_ctx;
 	gtp_switch_t *ctx;
-	gtp_server_t *srv;
-	gtp_server_worker_t *worker, *w_tmp;
 	gtp_plmn_stats_t *plmn_stats;
 	gtp_ip_stats_t *ip_stats;
 	struct hlist_node *n;
 	struct hlist_node *hl_tmp;
 	gtp_htab_t *tmp_plmns = NULL;
-	gtp_plmn_stats_t *tmp_plmn_stats;
 	gtp_htab_t *tmp_ips = NULL;
-	gtp_ip_stats_t *tmp_ip_stats;
 	uint8_t unknown_plmn[GTP_PLMN_MAX_LEN] = {0};
 
 
@@ -274,65 +312,9 @@ gtp_stats_show(vty_t *vty, plmn_t plmn)
 	}
 
 	list_for_each_entry(ctx, l, next) {
-		srv = &ctx->gtpc;
-		list_for_each_entry_safe(worker, w_tmp, &srv->workers, next){
-			if(plmn){
-				struct hlist_head *plmn_stats_head;
-				plmn_stats_head = gtp_stats_plmn_hashkey(worker->stats.signalling_gtp->plmns, plmn);
-
-				hlist_for_each_entry_safe(plmn_stats, hl_tmp, n, plmn_stats_head, hlist){
-					if(memcmp(plmn_stats->plmn, plmn, sizeof(plmn_t))){
-						continue;
-					}
-					__gtp_sum_stats(stats_v1_rx, plmn_stats->v1_rx, 0xff);
-					__gtp_sum_stats(stats_v1_tx, plmn_stats->v1_tx, 0xff);
-					__gtp_sum_stats(stats_v2_rx, plmn_stats->v2_rx, 0xff);
-					__gtp_sum_stats(stats_v2_tx, plmn_stats->v2_tx, 0xff);
-
-					for (int i = 0; i < STATS_GTP_IP_HASHTAB_SIZE; i++) {
-						hlist_for_each_entry_safe(ip_stats, hl_tmp, n, &plmn_stats->peers->htab[i], hlist){
-							tmp_ip_stats = __gtp_stats_ip_hash(tmp_ips, ip_stats->ip);
-							__gtp_sum_stats(tmp_ip_stats->v1_rx, ip_stats->v1_rx, 0xff);
-							__gtp_sum_stats(tmp_ip_stats->v1_tx, ip_stats->v1_tx, 0xff);
-							__gtp_sum_stats(tmp_ip_stats->v2_rx, ip_stats->v2_rx, 0xff);
-							__gtp_sum_stats(tmp_ip_stats->v2_tx, ip_stats->v2_tx, 0xff);
-						}
-		
-					}
-				}
-			}else{
-				__gtp_sum_stats(stats_v1_rx, worker->stats.signalling_gtp->v1_rx, 0xff);
-				__gtp_sum_stats(stats_v1_tx, worker->stats.signalling_gtp->v1_tx, 0xff);
-				__gtp_sum_stats(stats_v2_rx, worker->stats.signalling_gtp->v2_rx, 0xff);
-				log_message(LOG_INFO, "%s(): stats_v2_rx at %p, worker %d"
-					, __FUNCTION__
-					, &worker->stats.signalling_gtp->v2_rx, worker->id);
-				log_message(LOG_INFO, "%s(): stats_v2_rx create session request at %p, worker %d (%p), total:%lu, current:%lu"
-					, __FUNCTION__
-					, &worker->stats.signalling_gtp->v2_rx[32], worker->id, worker, stats_v2_rx[32].counter, worker->stats.signalling_gtp->v2_rx[32].counter);
-				log_message(LOG_INFO, "%s(): stats_v2_rx create session response at %p, worker %d (%p), total:%lu, current:%lu"
-					, __FUNCTION__
-					, &worker->stats.signalling_gtp->v2_rx[33], worker->id, worker, stats_v2_rx[33].counter, worker->stats.signalling_gtp->v2_rx[33].counter);
-				__gtp_sum_stats(stats_v2_tx, worker->stats.signalling_gtp->v2_tx, 0xff);
-				for (int i = 0; i < STATS_GTP_PLMN_HASHTAB_SIZE; i++) {
-					hlist_for_each_entry_safe(plmn_stats, hl_tmp, n, &worker->stats.signalling_gtp->plmns->htab[i], hlist){
-						tmp_plmn_stats = __gtp_stats_plmn_hash(tmp_plmns, plmn_stats->plmn);
-						__gtp_sum_stats(tmp_plmn_stats->v1_rx, plmn_stats->v1_rx, 0xff);
-						__gtp_sum_stats(tmp_plmn_stats->v1_tx, plmn_stats->v1_tx, 0xff);
-						__gtp_sum_stats(tmp_plmn_stats->v2_rx, plmn_stats->v2_rx, 0xff);
-						log_message(LOG_INFO, "%s(): stats_v2_rx create session request for PLMN %02hhx%02hhx%02hhx, worker %d; total:%lu, current:%lu"
-							, __FUNCTION__
-							, plmn_stats->plmn[0], plmn_stats->plmn[1], plmn_stats->plmn[2], worker->id, tmp_plmn_stats->v2_rx[32].counter, plmn_stats->v2_rx[32].counter);		
-						log_message(LOG_INFO, "%s(): stats_v2_rx create session response for PLMN %02hhx%02hhx%02hhx, worker %d; total:%lu, current:%lu"
-							, __FUNCTION__
-							, plmn_stats->plmn[0], plmn_stats->plmn[1], plmn_stats->plmn[2], worker->id, tmp_plmn_stats->v2_rx[33].counter, plmn_stats->v2_rx[33].counter);		
-	
-						__gtp_sum_stats(tmp_plmn_stats->v2_tx, plmn_stats->v2_tx, 0xff);
-
-					}
-				}
-
-			}
+		__gtp_stats_show_gtp_server(&ctx->gtpc, plmn, tmp_plmns, tmp_ips, stats_v1_rx, stats_v1_tx, stats_v2_rx, stats_v2_tx);
+		if (__test_bit(GTP_FL_CTL_BIT, &ctx->gtpc_egress.flags)) {
+			__gtp_stats_show_gtp_server(&ctx->gtpc_egress, plmn, tmp_plmns, tmp_ips, stats_v1_rx, stats_v1_tx, stats_v2_rx, stats_v2_tx);
 		}
 		if(plmn){
 			char splmn_s[7];
@@ -361,7 +343,7 @@ gtp_stats_show(vty_t *vty, plmn_t plmn)
 			FREE(tmp_ips);
 		}else{
 			for(int j=0; j < 0xff; j++){
-				if(stats_v2_rx[j].counter > 0 || stats_v2_tx[j].counter > 0 || stats_v2_rx[j].dropped > 0 || j==33){
+				if(stats_v2_rx[j].counter > 0 || stats_v2_tx[j].counter > 0 || stats_v2_rx[j].dropped > 0){
 					vty_out(vty, "  %s :\t%lu\t%lu\t%lu%s", gtp2c_msg_type2str[j].name, stats_v2_rx[j].counter, stats_v2_tx[j].counter, stats_v2_rx[j].dropped, VTY_NEWLINE);
 				}
 			}
@@ -375,7 +357,7 @@ gtp_stats_show(vty_t *vty, plmn_t plmn)
 						vty_out(vty, "  PLMN %s\t\t\t\trx\ttx\tdrp%s", splmn_s, VTY_NEWLINE);
 					}
 					for(int j=0; j < 0xff; j++){
-						if(plmn_stats->v2_rx[j].counter > 0 || plmn_stats->v2_tx[j].counter > 0 || plmn_stats->v2_rx[j].dropped > 0 || j==33){
+						if(plmn_stats->v2_rx[j].counter > 0 || plmn_stats->v2_tx[j].counter > 0 || plmn_stats->v2_rx[j].dropped > 0){
 							vty_out(vty, "    %s :\t%lu\t%lu\t%lu%s", gtp2c_msg_type2str[j].name, plmn_stats->v2_rx[j].counter, plmn_stats->v2_tx[j].counter, plmn_stats->v2_rx[j].dropped, VTY_NEWLINE);
 						}
 					}
