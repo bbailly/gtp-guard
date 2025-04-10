@@ -56,7 +56,7 @@ gtp_dpd_build_gtpu(gtp_iptnl_t *t, uint8_t *buffer)
 	gtph->piggybacked = 0;
 	gtph->teid_presence = 0;
 	gtph->spare = 0;
-	gtph->type = GTPU_ECHO_REQ_TYPE;
+	gtph->type = GTPU_ECHO_REQ;
 	gtph->length = htons(t->payload_len);
 	gtph->sqn_only = htonl(0x8badf00d);
 
@@ -257,7 +257,7 @@ gtp_dpd_ingress_sanitize(gtp_iptnl_t *t)
 
 	/* GTP-U header sanitize */
 	gtph = (gtp_hdr_t *) (t->recv_buffer + sizeof(struct iphdr) + sizeof(struct udphdr));
-	if (gtph->type != GTPU_ECHO_REQ_TYPE || gtph->sqn_only != htonl(0x8badf00d))
+	if (gtph->type != GTPU_ECHO_REQ || gtph->sqn_only != htonl(0x8badf00d))
 		return -1;
 
 	return 0;

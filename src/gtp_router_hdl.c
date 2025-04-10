@@ -622,7 +622,7 @@ gtpc_build_create_session_response(pkt_buffer_t *pbuff, gtp_session_t *s, gtp_te
 	int err = 0;
 
 	/* Header update */
-	gtpc_build_header(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE);
+	gtpc_build_header(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE);
 
 	/* Put IE */
 	err = err ? : gtpc_pkt_put_cause(pbuff, GTP2C_CAUSE_REQUEST_ACCEPTED, teid);
@@ -775,7 +775,7 @@ gtpc_pppoe_tlf(sppp_t *sp)
 
 	if (__test_bit(GTP_PPPOE_FL_AUTH_FAILED, &s->flags)) {
 		pbuff = pkt_buffer_alloc(GTP_BUFFER_SIZE);
-		gtpc_build_errmsg(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		gtpc_build_errmsg(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 					     , GTP2C_CAUSE_USER_AUTH_FAILED);
 		pkt_buffer_send(w->fd, pbuff, &s->gtpc_peer_addr);
 		pkt_buffer_free(pbuff);
@@ -826,7 +826,7 @@ gtpc_pppoe_create_session_response(sppp_t *sp)
 	s_gtp->ipv4 = htonl(sp->ipcp.req_myaddr);
 	ret = gtpc_build_create_session_response(pbuff, s_gtp, teid, &sp->ipcp);
 	if (ret < 0) {
-		gtpc_build_errmsg(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		gtpc_build_errmsg(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 					     , GTP2C_CAUSE_REQUEST_REJECTED);
 		goto end;
 	}
@@ -834,7 +834,7 @@ gtpc_pppoe_create_session_response(sppp_t *sp)
 	/* Setup GTP-U Fast-Path */
 	ret = gtp_session_gtpu_teid_xdp_add(s_gtp);
 	if (ret < 0) {
-		gtpc_build_errmsg(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		gtpc_build_errmsg(pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 					     , GTP2C_CAUSE_REQUEST_REJECTED);
 	}
 
@@ -877,7 +877,7 @@ gtpc_echo_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 		rec->recovery = daemon_data->restart_counter;
 	}
 
-	h->type = GTP2C_ECHO_RESPONSE_TYPE;
+	h->type = GTP2C_ECHO_RESPONSE;
 
 	return 0;
 }
@@ -911,7 +911,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!msg_ie) {
 		log_message(LOG_INFO, "%s(): no F_TEID IE present. ignoring..."
 				    , __FUNCTION__);
-		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_REQUEST_REJECTED);
 		goto end;
 	}
@@ -925,7 +925,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!ie_imsi) {
 		log_message(LOG_INFO, "%s(): no IMSI IE present. ignoring..."
 				    , __FUNCTION__);
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_REQUEST_REJECTED);
 		goto end;
 	}
@@ -940,7 +940,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!msg_ie) {
 		log_message(LOG_INFO, "%s(): no Access-Point-Name IE present. ignoring..."
 				    , __FUNCTION__);
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN);
 		goto end;
 	}
@@ -950,7 +950,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (ret < 0) {
 		log_message(LOG_INFO, "%s(): Error parsing Access-Point-Name IE. ignoring..."
 				    , __FUNCTION__);
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN);
 		goto end;
 	}
@@ -959,7 +959,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!apn) {
 		log_message(LOG_INFO, "%s(): Unknown Access-Point-Name:%s. ignoring..."
 				    , __FUNCTION__, apn_str);
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN);
 		goto end;
 	}
@@ -968,7 +968,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!msg_ie) {
 		log_message(LOG_INFO, "%s(): no PDN-TYPE IE present. ignoring..."
 				    , __FUNCTION__);
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_REQUEST_REJECTED);
 		goto end;
 	}
@@ -1015,7 +1015,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		log_message(LOG_INFO, "%s(): APN:%s All IP Address occupied"
 				    , __FUNCTION__
 				    , apn_str);
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED);
 		goto end;
 	}
@@ -1024,7 +1024,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!teid) {
 		log_message(LOG_INFO, "%s(): No GTP-C F-TEID, cant create session. ignoring..."
 				    , __FUNCTION__);
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_REQUEST_REJECTED);
 		gtp_ip_pool_put(apn, s->ipv4);
 		goto end;
@@ -1071,7 +1071,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		if (!pppoe) {
 			log_message(LOG_INFO, "No active PPPoE Instance available to handle request");
 			rc = gtpc_build_errmsg(w->pbuff, teid
-						       , GTP2C_CREATE_SESSION_RESPONSE_TYPE
+						       , GTP2C_CREATE_SESSION_RESPONSE
 						       , GTP2C_CAUSE_REQUEST_REJECTED);
 			goto end;
 		}
@@ -1082,7 +1082,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 				      imsi, s->mei, apn_str, ecgi, ambr);
 		if (!s_pppoe) {
 			rc = gtpc_build_errmsg(w->pbuff, teid
-						       , GTP2C_CREATE_SESSION_RESPONSE_TYPE
+						       , GTP2C_CREATE_SESSION_RESPONSE
 						       , GTP2C_CAUSE_REQUEST_REJECTED);
 			goto end;
 		}
@@ -1118,7 +1118,7 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 	teid = _gtpc_teid_get(h->teid, inet_sockaddrip4(&srv->addr));
 	if (!teid) {
-		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_DELETE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_DELETE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_CONTEXT_NOT_FOUND);
 		goto end;
 	}
@@ -1129,7 +1129,7 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!msg_ie) {
 		log_message(LOG_INFO, "%s(): no F_TEID IE present. ignoring..."
 				    , __FUNCTION__);
-		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_CREATE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_CREATE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_INVALID_PEER);
 		goto end;
 	}
@@ -1139,7 +1139,7 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	ipv4 = *(uint32_t *) (ie_buffer + offsetof(gtp_ie_f_teid_t, ipv4));
 	pteid = _gtpc_teid_get(id, ipv4);
 	if (!pteid) {
-		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_DELETE_SESSION_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, teid, GTP2C_DELETE_SESSION_RESPONSE
 						     , GTP2C_CAUSE_INVALID_PEER);
 		goto end;
 	}
@@ -1157,7 +1157,7 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	gtp_sqn_update(w, pteid);
 
 	rc = gtpc_build_errmsg(w->pbuff, pteid
-				       , GTP2C_DELETE_SESSION_RESPONSE_TYPE
+				       , GTP2C_DELETE_SESSION_RESPONSE
 				       , GTP2C_CAUSE_REQUEST_ACCEPTED);
 
 	gtp_teid_put(teid);
@@ -1192,7 +1192,7 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		log_message(LOG_INFO, "%s(): Unknown TEID 0x%.8x..."
 				    , __FUNCTION__
 				    , ntohl(h->teid));
-		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_MODIFY_BEARER_RESPONSE_TYPE
+		rc = gtpc_build_errmsg(w->pbuff, NULL, GTP2C_MODIFY_BEARER_RESPONSE
 						     , GTP2C_CAUSE_CONTEXT_NOT_FOUND);
 		goto end;
 	}
@@ -1245,7 +1245,7 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		gtp_session_gtpu_teid_xdp_add(s);
 
   accept:
-	rc = gtpc_build_errmsg(w->pbuff, teid->peer_teid, GTP2C_MODIFY_BEARER_RESPONSE_TYPE
+	rc = gtpc_build_errmsg(w->pbuff, teid->peer_teid, GTP2C_MODIFY_BEARER_RESPONSE
 							, GTP2C_CAUSE_REQUEST_ACCEPTED);
   end:
 	gtp_msg_destroy(msg);
@@ -1292,10 +1292,10 @@ gtpc_change_notification_request_hdl(gtp_server_worker_t *w, struct sockaddr_sto
 static const struct {
 	int (*hdl) (gtp_server_worker_t *, struct sockaddr_storage *);
 } gtpc_msg_hdl[0xff + 1] = {
-	[GTP2C_ECHO_REQUEST_TYPE]			= { gtpc_echo_request_hdl },
-	[GTP2C_CREATE_SESSION_REQUEST_TYPE]	= { gtpc_create_session_request_hdl },
-	[GTP2C_DELETE_SESSION_REQUEST_TYPE]	= { gtpc_delete_session_request_hdl },
-	[GTP2C_MODIFY_BEARER_REQUEST_TYPE]	= { gtpc_modify_bearer_request_hdl },
+	[GTP2C_ECHO_REQUEST]			= { gtpc_echo_request_hdl },
+	[GTP2C_CREATE_SESSION_REQUEST]	= { gtpc_create_session_request_hdl },
+	[GTP2C_DELETE_SESSION_REQUEST]	= { gtpc_delete_session_request_hdl },
+	[GTP2C_MODIFY_BEARER_REQUEST]	= { gtpc_modify_bearer_request_hdl },
 	[GTP2C_CHANGE_NOTIFICATION_REQUEST]	= { gtpc_change_notification_request_hdl },
 	[GTP2C_MODIFY_BEARER_COMMAND]		= { NULL },
 	[GTP2C_DELETE_BEARER_COMMAND]		= { NULL },
@@ -1328,7 +1328,7 @@ gtpu_echo_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 	gtp1_ie_recovery_t *rec;
 
 	/* 3GPP.TS.129.060 7.2.2 : IE Recovery is mandatory in response message */
-	h->type = GTPU_ECHO_RSP_TYPE;
+	h->type = GTPU_ECHO_RSP;
 	h->length = htons(ntohs(h->length) + sizeof(gtp1_ie_recovery_t));
 	pkt_buffer_set_end_pointer(w->pbuff, gtp1_get_header_len(h));
 	pkt_buffer_set_data_pointer(w->pbuff, gtp1_get_header_len(h));
@@ -1357,9 +1357,9 @@ gtpu_end_marker_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 static const struct {
 	int (*hdl) (gtp_server_worker_t *, struct sockaddr_storage *);
 } gtpu_msg_hdl[0xff + 1] = {
-	[GTPU_ECHO_REQ_TYPE]			= { gtpu_echo_request_hdl },
-	[GTPU_ERR_IND_TYPE]			= { gtpu_error_indication_hdl },
-	[GTPU_END_MARKER_TYPE]			= { gtpu_end_marker_hdl	},
+	[GTPU_ECHO_REQ]			= { gtpu_echo_request_hdl },
+	[GTPU_ERR_IND]			= { gtpu_error_indication_hdl },
+	[GTPU_END_MARKER]			= { gtpu_end_marker_hdl	},
 };
 
 int

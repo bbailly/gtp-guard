@@ -823,16 +823,16 @@ gtp_flags2str(char *str, size_t str_len, unsigned long flags)
  *	MSG Types defs
  */
 // static const gtp_msg_type_map_t gtp1c_msg_type2str[0xff] = {
-// 	[GTP1C_ECHO_REQUEST_TYPE] = {
-// 		.name = "GTP1C_ECHO_REQUEST_TYPE",
+// 	[GTP1C_ECHO_REQUEST] = {
+// 		.name = "GTP1C_ECHO_REQUEST",
 // 		.description = "Used to check GTP control-plane connectivity between two nodes."
 // 	},
-// 	[GTP1C_ECHO_RESPONSE_TYPE] = {
-// 		 .name = "GTP1C_ECHO_RESPONSE_TYPE",
+// 	[GTP1C_ECHO_RESPONSE] = {
+// 		 .name = "GTP1C_ECHO_RESPONSE",
 // 		 .description = "Response confirming connectivity to a GTP Echo Request."
 // 	},
-// 	[GTP1C_VERSION_NOT_SUPPORTED_INDICATION_TYPE] = {
-// 		 .name = "GTP1C_VERSION_NOT_SUPPORTED_INDICATION_TYPE",
+// 	[GTP1C_VERSION_NOT_SUPPORTED_INDICATION] = {
+// 		 .name = "GTP1C_VERSION_NOT_SUPPORTED_INDICATION",
 // 		 .description = "Indicates that the requested GTP version is not supported."
 // 	},
 // 	[GTP1C_CREATE_PDP_CONTEXT_REQUEST] = {
@@ -862,41 +862,41 @@ gtp_flags2str(char *str, size_t str_len, unsigned long flags)
 // 	/* any non listed records: 0 initialiazed */
 // };
 
-static const gtp_msg_type_map_t gtp2c_msg_type2str[0xff] = {
-	[GTP2C_ECHO_REQUEST_TYPE] = {
-		.name = "GTP2C_ECHO_REQUEST_TYPE",
+const gtp_msg_type_map_t gtp2c_msg_type2str[0xff] = {
+	[GTP2C_ECHO_REQUEST] = {
+		.name = "GTP2C_ECHO_REQUEST",
 		.description = "Used to check GTP control-plane connectivity between two nodes."
 	},
-	[GTP2C_ECHO_RESPONSE_TYPE] = {
-		 .name = "GTP2C_ECHO_RESPONSE_TYPE",
+	[GTP2C_ECHO_RESPONSE] = {
+		 .name = "GTP2C_ECHO_RESPONSE",
 		 .description = "Response confirming connectivity to a GTP Echo Request."
 	},
-	[GTP2C_VERSION_NOT_SUPPORTED_INDICATION_TYPE] = {
-		 .name = "GTP2C_VERSION_NOT_SUPPORTED_INDICATION_TYPE",
+	[GTP2C_VERSION_NOT_SUPPORTED_INDICATION] = {
+		 .name = "GTP2C_VERSION_NOT_SUPPORTED_INDICATION",
 		 .description = "Indicates that the requested GTP version is not supported."
 	},
-	[GTP2C_CREATE_SESSION_REQUEST_TYPE] = {
-		.name = "GTP2C_CREATE_SESSION_REQUEST_TYPE",
-		.description = "Requests establishment of a new session (bearer) in GTPv2."
+	[GTP2C_CREATE_SESSION_REQUEST] = {
+		.name = "GTP2C_CREATE_SESSION_REQUEST",
+		.description = "Requests establishment of a new PDN session in GTPv2."
 	},
-	[GTP2C_CREATE_SESSION_RESPONSE_TYPE] = {
-		.name = "GTP2C_CREATE_SESSION_RESPONSE_TYPE",
+	[GTP2C_CREATE_SESSION_RESPONSE] = {
+		.name = "GTP2C_CREATE_SESSION_RESPONSE",
 		.description = "Returns acceptance or rejection of a Create Session Request."
 	},
-	[GTP2C_MODIFY_BEARER_REQUEST_TYPE] = {
-		.name = "GTP2C_MODIFY_BEARER_REQUEST_TYPE",
+	[GTP2C_MODIFY_BEARER_REQUEST] = {
+		.name = "GTP2C_MODIFY_BEARER_REQUEST",
 		.description = "Requests modification of parameters for an existing bearer."
 	},
-	[GTP2C_MODIFY_BEARER_RESPONSE_TYPE] = {
-		.name = "GTP2C_MODIFY_BEARER_RESPONSE_TYPE",
+	[GTP2C_MODIFY_BEARER_RESPONSE] = {
+		.name = "GTP2C_MODIFY_BEARER_RESPONSE",
 		.description = "Returns acceptance or rejection of a Modify Bearer Request."
 	},
-	[GTP2C_DELETE_SESSION_REQUEST_TYPE] = {
-		.name = "GTP2C_DELETE_SESSION_REQUEST_TYPE",
-		.description = "Requests deletion of a session (bearer)."
+	[GTP2C_DELETE_SESSION_REQUEST] = {
+		.name = "GTP2C_DELETE_SESSION_REQUEST",
+		.description = "Requests deletion of a session."
 	},
-	[GTP2C_DELETE_SESSION_RESPONSE_TYPE] = {
-		.name = "GTP2C_DELETE_SESSION_RESPONSE_TYPE",
+	[GTP2C_DELETE_SESSION_RESPONSE] = {
+		.name = "GTP2C_DELETE_SESSION_RESPONSE",
 		.description = "Returns acceptance or rejection of a Delete Session Request."
 	},
 	[GTP2C_CHANGE_NOTIFICATION_REQUEST] = {
@@ -986,29 +986,29 @@ static const gtp_msg_type_map_t gtp2c_msg_type2str[0xff] = {
 	/* any non listed records: 0 initialiazed */
 };
 
-static const gtp_msg_type_map_t gtp1u_msg_type2str[256] = {
-	[GTPU_ECHO_REQ_TYPE] = {
-		.name = "GTPU_ECHO_REQ_TYPE",
+const gtp_msg_type_map_t gtp1u_msg_type2str[256] = {
+	[GTPU_ECHO_REQ] = {
+		.name = "GTPU_ECHO_REQ",
 		.description = "Used to verify path connectivity in GTP-U (Echo Request)."
 	},
-	[GTPU_ECHO_RSP_TYPE] = {
-		.name = "GTPU_ECHO_RSP_TYPE",
+	[GTPU_ECHO_RSP] = {
+		.name = "GTPU_ECHO_RSP",
 		.description = "Response confirming path connectivity (Echo Response)."
 	},
-	[GTPU_ERR_IND_TYPE] = {
-		.name = "GTPU_ERR_IND_TYPE",
+	[GTPU_ERR_IND] = {
+		.name = "GTPU_ERR_IND",
 		.description = "Indicates an error in the user-plane path (e.g., TEID mismatch)."
 	},
-	[GTPU_SUPP_EXTHDR_NOTI_TYPE] = {
-		.name = "GTPU_SUPP_EXTHDR_NOTI_TYPE",
+	[GTPU_SUPP_EXTHDR_NOTI] = {
+		.name = "GTPU_SUPP_EXTHDR_NOTI",
 		.description = "Notification that the GTP-U entity supports extension headers."
 	},
-	[GTPU_END_MARKER_TYPE] = {
-		.name = "GTPU_END_MARKER_TYPE",
+	[GTPU_END_MARKER] = {
+		.name = "GTPU_END_MARKER",
 		.description = "Marks the end of data forwarding during a handover procedure."
 	},
-	[GTPU_GPDU_TYPE] = {
-		.name = "GTPU_GPDU_TYPE",
+	[GTPU_GPDU] = {
+		.name = "GTPU_GPDU",
 		.description = "The G-PDU (payload) message that carries user data over GTP-U."
 	},
 	/* any non listed records: 0 initialiazed */
@@ -1036,7 +1036,7 @@ gtp_msgtype2str(int type, int idx)
 /*
  *	Cause defs
  */
-static const gtp_msg_type_map_t gtp1c_msg_cause2str[0xff] = {
+const gtp_msg_type_map_t gtp1c_msg_cause2str[0xff] = {
 	[GTP1C_CAUSE_REQUEST_ACCEPTED] = {
 		.name = "GTP1C_CAUSE_REQUEST_ACCEPTED",
 		.description = "Cause (GTPv1): request accepted by the receiving node."
@@ -1048,7 +1048,7 @@ static const gtp_msg_type_map_t gtp1c_msg_cause2str[0xff] = {
 	/* any non listed records: 0 initialiazed */
 };
 
-static const gtp_msg_type_map_t gtp2c_msg_cause2str[0xff] = {
+const gtp_msg_type_map_t gtp2c_msg_cause2str[0xff] = {
 	[GTP2C_CAUSE_REQUEST_ACCEPTED] = {
 		.name = "GTP2C_CAUSE_REQUEST_ACCEPTED",
 		.description = "Cause: request accepted by the receiving node."

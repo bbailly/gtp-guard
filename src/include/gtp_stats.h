@@ -40,51 +40,69 @@ typedef enum _session_type {
 
 
 typedef struct _gtp_stats {
-	uint64_t		count;
+	uint64_t		counter;
 	uint64_t		unsupported;
+	uint64_t		dropped;
 } gtp_stats_t;
 
-
-typedef struct _gtp_ip_stats {
-	struct sockaddr		ip;
+typedef struct _gtp_gtp_stats {
+	/* gtp_stats_t SHALL be first */
 	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
 	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
 	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
 	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
-	struct hlist_node       hlist;
+
+} gtp_gtp_stats_t;
+
+
+typedef struct _gtp_ip_stats {
+	/* gtp_stats_t SHALL be first */
+	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
+	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
+	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
+	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
+
+	struct sockaddr_storage	*ip;
+	struct hlist_node	hlist;
 } gtp_ip_stats_t;
 
 
 typedef struct _gtp_plmn_stats {
-	plmn_t			plmn;
-	gtp_htab_t		*peers;
+	/* gtp_stats_t SHALL be first */
 	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
 	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
 	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
 	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
-	struct hlist_node       hlist;
+
+	uint8_t			*plmn;
+	gtp_htab_t		*peers;
+	struct hlist_node	hlist;
 } gtp_plmn_stats_t;
 
 typedef struct _gtp_signalling_gtp_stats {
-	gtp_htab_t		*plmns;
+	/* gtp_stats_t SHALL be first */
 	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
 	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
 	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
 	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
+
+	gtp_htab_t		*plmns;
 } gtp_signalling_gtp_stats_t;
 
 typedef struct _gtp_pppoe_instance_stats {
-	char			*name;
 	gtp_stats_t		rx[0xff]; /* PPPoE RX stats */
 	gtp_stats_t		tx[0xff]; /* PPPoE RX stats */
-	struct hlist_node       hlist;
+
+	char			*name;
+	struct hlist_node	hlist;
 } gtp_pppoe_instance_stats_t;
 
 
 typedef struct _gtp_signalling_pppoe_stats {
-	gtp_htab_t		*instances;
 	gtp_stats_t		rx[0xff];
 	gtp_stats_t		tx[0xff];
+
+	gtp_htab_t		*instances;
 } gtp_signalling_pppoe_stats_t;
 
 
@@ -101,6 +119,13 @@ typedef struct _gtp_server_stats {
 extern int gtp_stats_vty_init(void);
 
 /* PLMN, IP, gtp version, direction, message type, cause */
-extern int gtp_stats_gtp_signalling_inc(gtp_server_stats_t, plmn_t, struct sockaddr_storage *, protocol_t, direction_t, uint8_t, uint8_t);
+extern void gtp_stats_gtp_signalling_inc_counter(gtp_server_stats_t *, uint8_t *, struct sockaddr_storage *, uint8_t, direction_t, uint8_t, uint8_t);
+
+/* PLMN, IP, gtp version, direction, message type */
+extern void gtp_stats_gtp_signalling_inc_unsupported(gtp_server_stats_t *, uint8_t *, struct sockaddr_storage *, uint8_t, uint8_t);
+
+/* PLMN, IP, gtp version, direction, message type */
+extern void gtp_stats_gtp_signalling_inc_dropped(gtp_server_stats_t *, uint8_t *, struct sockaddr_storage *, uint8_t, uint8_t);
+
 
 #endif

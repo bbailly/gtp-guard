@@ -92,6 +92,7 @@ typedef struct _gtp_plmn {
 typedef struct _gtp_apn {
 	char			name[GTP_APN_MAX_LEN];
 	char			realm[GTP_REALM_LEN];
+	gtp_plmn_t		plmn;
 	struct sockaddr_storage	nameserver;
 	struct sockaddr_storage	nameserver_bind;
 	int			nameserver_timeout;

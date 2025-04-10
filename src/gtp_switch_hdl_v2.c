@@ -206,7 +206,7 @@ gtpc_echo_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr, int
 		rec->recovery = daemon_data->restart_counter;
 	}
 
-	h->type = GTP2C_ECHO_RESPONSE_TYPE;
+	h->type = GTP2C_ECHO_RESPONSE;
 
 	return &dummy_teid;
 }
@@ -219,13 +219,15 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	gtp_ie_serving_network_t *ie_serving_network;
 	gtp_server_t *srv = w->srv;
 	gtp_switch_t *ctx = srv->ctx;
+	gtp_hdr_t *h = (gtp_hdr_t *) w->pbuff->head;
 	gtp_teid_t *teid = NULL;
 	gtp_conn_t *c;
 	gtp_session_t *s = NULL;
 	gtp_apn_t *apn;
 	bool retransmit = false;
 	uint64_t imsi;
-	uint8_t *cp, *serving_network;
+	uint8_t *cp;
+	gtp_ie_serving_network_t *serving_network;
 	char apn_str[64];
 	char apn_plmn[64];
 	int err;
@@ -243,11 +245,12 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (s)
 		retransmit = true;
 
-	/* Serving Network IE shall be present */
-	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
-	if(!cp){
+	/* Serving Network */
+	serving_network = (gtp_ie_serving_network_t *) gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
+	if (!serving_network) {
 		log_message(LOG_INFO, "%s(): no Serving Network IE present. ignoring..."
 				    , __FUNCTION__);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
 		return NULL;
 	}
 
@@ -256,14 +259,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!cp) {
 		log_message(LOG_INFO, "%s(): no F_TEID IE present. ignoring..."
 				    , __FUNCTION__);
-		return NULL;
-	}
-
-	/* Serving Network */
-	serving_network = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
-	if (!serving_network) {
-		log_message(LOG_INFO, "%s(): no Serving Netwokr IE present. ignoring..."
-				    , __FUNCTION__);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, serving_network->mcc_mnc, addr, h->version, h->type);
 		return NULL;
 	}
 
@@ -272,6 +268,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!cp) {
 		log_message(LOG_INFO, "%s(): no Access-Point-Name IE present. ignoring..."
 				    , __FUNCTION__);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, serving_network->mcc_mnc, addr, h->version, h->type);
 		return NULL;
 	}
 
@@ -281,6 +278,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (err) {
 		log_message(LOG_INFO, "%s(): Error parsing Access-Point-Name IE. ignoring..."
 				    , __FUNCTION__);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, serving_network->mcc_mnc, addr, h->version, h->type);
 		return NULL;
 	}
 
@@ -288,6 +286,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!apn) {
 		log_message(LOG_INFO, "%s(): Unknown Access-Point-Name:%s. ignoring..."
 				    , __FUNCTION__, apn_str);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, serving_network->mcc_mnc, addr, h->version, h->type);
 		return NULL;
 	}
 	w->apn = apn_str;
@@ -301,6 +300,8 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!cp) {
 		log_message(LOG_INFO, "%s(): no IMSI IE present. ignoring..."
 				    , __FUNCTION__);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, serving_network->mcc_mnc, addr, h->version, h->type);
+
 		return NULL;
 	}
 
@@ -323,17 +324,12 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* Rewrite IMSI if needed */
 	gtp_ie_imsi_rewrite(apn, cp);
 
-	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
-	if(cp){
-		gtp_ie_serving_network_t* serving_network = (gtp_ie_serving_network_t*) cp;
-		memcpy(s->serving_plmn.plmn,serving_network->mcc_mnc, sizeof(serving_network->mcc_mnc));
-		char splmn_s[7];
-		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
-		log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
-			, __FUNCTION__
-			, splmn_s);
-		gtp_stats_gtp_signalling_inc(w->stats, s->serving_plmn.plmn, addr, proto_gtpv2, dir_rx, GTP2C_CREATE_SESSION_REQUEST_TYPE, 0);
-	}
+	memcpy(s->serving_plmn.plmn, serving_network->mcc_mnc, GTP_PLMN_MAX_LEN);
+	char splmn_s[7];
+	plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);
+	log_message(LOG_DEBUG, "%s(): current serving plmn is %s"
+		, __FUNCTION__
+		, splmn_s);
 
 	gtp_roaming_status_t roaming_status = gtp_get_roaming_status(ie_imsi->imsi, s->serving_plmn.plmn, &apn->hplmn);
 	log_message(LOG_DEBUG, "%s(): current roaming status is %s"
@@ -345,8 +341,11 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!teid) {
 		log_message(LOG_INFO, "%s(): Error while xlat. ignoring..."
 				    , __FUNCTION__);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, s->serving_plmn.plmn, addr, h->version, h->type);
 		goto end;
 	}
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+
 
 	/* Set Serving PLMN */
 	ie_serving_network = (gtp_ie_serving_network_t *) serving_network;
@@ -372,6 +371,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 	if (retransmit) {
 		gtp_sqn_masq(w, teid);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
 		goto end;
 	}
 
@@ -388,13 +388,16 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* pGW selection */
 	if (__test_bit(GTP_FL_FORCE_PGW_BIT, &ctx->flags)) {
 		teid->pgw_addr = *(struct sockaddr_in *) &ctx->pgw_addr;
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
 		goto end;
 	}
 
 	if (__test_bit(GTP_APN_FL_REALM_DYNAMIC, &apn->flags)) {
 		err = gtp_ie_apn_extract_plmn(ie_apn, apn_plmn, 63);
-		if (err)
+		if (err){
+			/* TODO what are we supposed to do here for stats? */
 			goto end;
+		}
 
 		err = gtp_sched_dynamic(apn, apn_str, apn_plmn, &teid->pgw_addr, &teid->sgw_addr, &s->flags);
 		if (err) {
@@ -404,6 +407,12 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 			gtp_teid_put(teid);
 			gtp_session_destroy(s);
 			teid = NULL;
+		}else{
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+			log_message(LOG_INFO, "%s(): increase counter for create session request (worker %d (%p), %hhu, %02hhx%02hhx%02hhx, %u.%u.%u.%u, version=%hhu)"
+				, __FUNCTION__
+				, w->id, w, h->type, s->serving_plmn.plmn[0], s->serving_plmn.plmn[1], s->serving_plmn.plmn[2], NIPQUAD(((struct sockaddr_in*)addr)->sin_addr), h->version);
+	
 		}
 
 		goto end;
@@ -417,7 +426,9 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		gtp_teid_put(teid);
 		gtp_session_destroy(s);
 		teid = NULL;
-    }
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+	}
 
   end:
 	gtp_conn_put(c);
@@ -443,7 +454,16 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 					    , __FUNCTION__
 					    , ntohl(h->sqn)
 					    , ntohl(h->teid));
+			gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 			return NULL;
+		}
+
+		cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
+		if (cp) {
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+		}else{
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
 		}
 
 		/* IMSI rewrite if needed */
@@ -483,6 +503,7 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 
 		/* Force delete session */
 		t->session->action = GTP_ACTION_DELETE_SESSION;
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, NULL, addr, h->version, dir_rx, h->type, 0);
 
 		goto end;
 	}
@@ -515,7 +536,14 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 		if (!(ie_cause->value >= 16 && ie_cause->value <= 63)) {
 			teid->session->action = GTP_ACTION_DELETE_SESSION;
 		}
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+		log_message(LOG_INFO, "%s(): increase counter for create session response (worker %d (%p), %hhu, %02hhx%02hhx%02hhx, %u.%u.%u.%u, version=%hhu)"
+			, __FUNCTION__
+			, w->id, w, h->type, teid->session->apn->plmn.plmn[0], teid->session->apn->plmn.plmn[1], teid->session->apn->plmn.plmn[2], NIPQUAD(((struct sockaddr_in*)addr)->sin_addr), h->version);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
 	}
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
 
   end:
 	gtp_teid_put(t);
@@ -537,10 +565,13 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		log_message(LOG_INFO, "%s(): unknown TEID:0x%.8x from gtp header. ignoring..."
 				    , __FUNCTION__
 				    , ntohl(h->teid));
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+    
 		return NULL;
 	}
 
 	log_message(LOG_INFO, "Delete-Session-Req:={F-TEID:0x%.8x}", ntohl(teid->id));
+
 
 	/* IMSI rewrite if needed */
 	cp = gtp_get_ie(GTP_IE_IMSI_TYPE, w->pbuff);
@@ -551,6 +582,12 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* Set pGW TEID */
 	h->teid = teid->id;
 	s = teid->session;
+
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}
 
 	/* Update addr tunnel endpoint */
 	gtp_teid_update_sgw(teid, addr);
@@ -569,7 +606,13 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* Finally set expiration timeout if used */
 	if (__test_bit(GTP_FL_SESSION_EXPIRATION_DELETE_TO_BIT, &ctx->flags))
 		gtp_session_mod_timer(s, ctx->session_delete_to);
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
 
+	}
+	
 	return teid;
 }
 
@@ -582,6 +625,9 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 	gtp_switch_t *ctx = srv->ctx;
 	gtp_teid_t *teid;
 	uint8_t *cp;
+	gtp_session_t *s;
+	int err;
+	gtp_ie_serving_network_t *ie_serving_network;
 
 	teid = gtp_vteid_get(&ctx->vteid_tab, ntohl(h->teid));
 	if (!teid) {
@@ -592,8 +638,11 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 					    , __FUNCTION__
 					    , ntohl(h->sqn)
 					    , ntohl(h->teid));
+			gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 			return NULL;
 		}
+		
 
 		/* IMSI rewrite if needed */
 		cp = gtp_get_ie(GTP_IE_IMSI_TYPE, w->pbuff);
@@ -613,10 +662,11 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 		return teid;
 	}
 
+	s = teid->session;
 	/* IMSI rewrite if needed */
 	cp = gtp_get_ie(GTP_IE_IMSI_TYPE, w->pbuff);
 	if (cp) {
-		gtp_ie_imsi_rewrite(teid->session->apn, cp);
+		gtp_ie_imsi_rewrite(s->apn, cp);
 	}
 
 	/* Set sGW TEID */
@@ -628,6 +678,21 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 	/* SQN masq */
 	gtp_sqn_restore(w, teid->peer_teid);
 
+	/* Update Serving Network */
+	cp = gtp_get_ie(GTP_IE_SERVING_NETWORK_TYPE, w->pbuff);
+	if (cp) {
+		ie_serving_network = (gtp_ie_serving_network_t *) cp;
+		memcpy(s->serving_plmn.plmn, ie_serving_network->mcc_mnc, GTP_PLMN_MAX_LEN);
+	}
+
+	/* Update session roaming status */
+	err = gtp_session_roaming_status_set(s);
+	if (err) {
+		log_message(LOG_INFO, "%s(): unable to update Roaming Status for IMSI:%ld"
+				    , __FUNCTION__
+				    , s->conn->imsi);
+	}
+
 	/* Test cause code, destroy if == success.
 	 * 3GPP.TS.29.274 8.4 */
 	cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
@@ -638,6 +703,13 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 		    ie_cause->value == GTP2C_CAUSE_INVALID_PEER) {
 			teid->session->action = GTP_ACTION_DELETE_SESSION;
 		}
+	}
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause ? ie_cause->value : 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, ie_cause ? ie_cause->value : 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause ? ie_cause->value : 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, ie_cause ? ie_cause->value : 0);
 	}
 
 	return teid;
@@ -661,6 +733,8 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		log_message(LOG_INFO, "%s(): unknown TEID:0x%.8x from gtp header. ignoring..."
 				    , __FUNCTION__
 				    , ntohl(h->teid));
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, h->type);
+
 		return NULL;
 	}
 
@@ -699,6 +773,8 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 				    , s->conn->imsi);
 	}
 
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+
 	/* ULI tag */
 	if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &s->apn->flags) &&
 	    __test_bit(GTP_SESSION_FL_ROAMING_OUT, &s->flags))
@@ -718,11 +794,16 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	t = gtpc_session_xlat(w, s, direction);
 	if (!t) {
 		/* There is no GTP-C update, so just forward */
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+
 		return teid;
 	}
 
-	if (t->peer_teid)
+	if (t->peer_teid){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &t->pgw_addr, h->version, dir_tx, h->type, 0);
+
 		goto end;
+	}
 
 	/* No peer teid so new teid */
 	/* Set tunnel endpoint */
@@ -739,6 +820,7 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		t->bearer_teid = t_u;
 		t_u->old_teid = (pteid) ? pteid->bearer_teid : NULL;
 	}
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
 
   end:
 	gtp_teid_put(t);
@@ -765,8 +847,14 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 					    , __FUNCTION__
 					    , ntohl(h->sqn)
 					    , ntohl(h->teid));
+			gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 			return NULL;
 		}
+
+		ie_cause = (gtp_ie_cause_t *) gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause?ie_cause->value : 0);
+
 
 		/* IMSI rewrite if needed */
 		cp = gtp_get_ie(GTP_IE_IMSI_TYPE, w->pbuff);
@@ -779,6 +867,9 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 		/* SQN masq */
 		gtp_sqn_restore(w, teid->peer_teid);
+		
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause?ie_cause->value : 0);
+
 
 		return teid;
 	}
@@ -802,15 +893,24 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* Test cause code, destroy if <> success.
 	 * 3GPP.TS.29.274 8.4 */
 	cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
-	if (!cp)
+	if (!cp){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+
 		return teid;
+	}
 
 	oteid = teid->old_teid;
 	ie_cause = (gtp_ie_cause_t *) cp;
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+
 	if (!(ie_cause->value >= GTP2C_CAUSE_REQUEST_ACCEPTED &&
 	      ie_cause->value <= 63)) {
 		if (oteid)
 			gtp_sqn_restore(w, oteid->peer_teid);
+		
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
+
 		return teid;
 	}
 
@@ -827,6 +927,8 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 			gtp_teid_bind(oteid->peer_teid, teid_u);
 		gtp_session_gtpu_teid_destroy(oteid);
 	}
+
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
 
   end:
 	/* SQN masq */
@@ -851,6 +953,8 @@ gtpc_delete_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		log_message(LOG_INFO, "%s(): unknown TEID:0x%.8x from gtp header. ignoring..."
 				    , __FUNCTION__
 				    , ntohl(h->teid));
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 		return NULL;
 	}
 
@@ -874,19 +978,27 @@ gtpc_delete_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	h->teid = teid->id;
 	s = teid->session;
 
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+
+
 	/* Msg from pGW, update pGW addr*/
 	gtp_teid_update_pgw(teid, addr);
 	gtp_teid_update_pgw(teid->peer_teid, addr);
 
 	cp = gtp_get_ie(GTP_IE_EPS_BEARER_ID_TYPE, w->pbuff);
-	if (!cp)
+	if (!cp){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+
 		return teid;
+	}
 
 	bearer_id = (gtp_ie_eps_bearer_id_t *) cp;
 
 	/* Flag related TEID */
 	teid->action = GTP_ACTION_DELETE_BEARER;
 	gtp_session_set_delete_bearer(s, bearer_id);
+
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
 
 	return teid;
 }
@@ -911,6 +1023,8 @@ gtpc_delete_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 					    , __FUNCTION__
 					    , ntohl(h->sqn)
 					    , ntohl(h->teid));
+			gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 			return NULL;
 		}
 	}
@@ -936,7 +1050,12 @@ gtpc_delete_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 				teid->session->action = GTP_ACTION_DELETE_SESSION;
 			gtp_session_destroy_bearer(s);
 		}
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
 	}
+
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
 
 	return teid;
 }
@@ -990,6 +1109,8 @@ gtpc_generic_xlat_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 		log_message(LOG_INFO, "%s(): unknown TEID:0x%.8x from gtp header. ignoring..."
 				    , __FUNCTION__
 				    , ntohl(h->teid));
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 		return NULL;
 	}
 
@@ -1018,6 +1139,12 @@ gtpc_generic_xlat_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 	h->teid = teid->id;
 	s = teid->session;
 
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}
+
 	/* Update addr */
 	gtpc_generic_updateaddr(direction, teid, addr);
 
@@ -1026,6 +1153,12 @@ gtpc_generic_xlat_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 	if (t) {
 		gtpc_generic_setaddr(addr, direction, teid, t);
 		gtp_teid_put(t);
+	}
+
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
 	}
 
 	return teid;
@@ -1047,6 +1180,8 @@ gtpc_generic_xlat_command_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 		log_message(LOG_INFO, "%s(): unknown TEID:0x%.8x from gtp header. ignoring..."
 				    , __FUNCTION__
 				    , ntohl(h->teid));
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 		return NULL;
 	}
 
@@ -1065,6 +1200,13 @@ gtpc_generic_xlat_command_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 	h->teid = teid->id;
 	s = teid->session;
 
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}
+
+
 	/* Update addr */
 	gtpc_generic_updateaddr(direction, teid, addr);
 
@@ -1077,6 +1219,12 @@ gtpc_generic_xlat_command_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 		/* GTP-C F-TEID is not mandatory, but we need to
 		 * update peer sqn for futur request */
 		gtp_sqn_update(w, teid->peer_teid);
+	}
+
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
 	}
 
 	return teid;
@@ -1102,8 +1250,12 @@ gtpc_generic_xlat_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 					    , __FUNCTION__
 					    , ntohl(h->sqn)
 					    , ntohl(h->teid));
+			gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+
 			return NULL;
 		}
+
+		s = teid->session;
 
 		/* IMSI rewrite if needed */
 		cp = gtp_get_ie(GTP_IE_IMSI_TYPE, w->pbuff);
@@ -1114,6 +1266,15 @@ gtpc_generic_xlat_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		/* SQN masq */
 		gtp_sqn_restore(w, teid->peer_teid);
 
+		if(direction == GTP_INGRESS){
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+
+		}else{
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+		}
+	
 		return teid;
 	}
 
@@ -1130,11 +1291,23 @@ gtpc_generic_xlat_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	h->teid = teid->id;
 	s = teid->session;
 
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	}
+
 	/* Performing session translation */
 	t = gtpc_session_xlat(w, s, direction);
 	if (t) {
 		gtpc_generic_setaddr(addr, direction, teid, t);
 		gtp_teid_put(t);
+	}
+
+	if(direction == GTP_INGRESS){
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
 	}
 
 	return teid;
@@ -1190,13 +1363,13 @@ static const struct {
 	int direction;	/* GTP_INGRESS : sGW -> pGW | GTP_EGRESS  : pGW -> sGW */
 	gtp_teid_t * (*hdl) (gtp_server_worker_t *, struct sockaddr_storage *, int);
 } gtpc_msg_hdl[0xff + 1] = {
-	[GTP2C_ECHO_REQUEST_TYPE]			= { GTP_INIT, GTP_INGRESS, gtpc_echo_request_hdl },
-	[GTP2C_CREATE_SESSION_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_create_session_request_hdl },
-	[GTP2C_CREATE_SESSION_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_create_session_response_hdl },
-	[GTP2C_DELETE_SESSION_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_delete_session_request_hdl },
-	[GTP2C_DELETE_SESSION_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_delete_session_response_hdl },
-	[GTP2C_MODIFY_BEARER_REQUEST_TYPE]	= { GTP_INIT, GTP_INGRESS, gtpc_modify_bearer_request_hdl },
-	[GTP2C_MODIFY_BEARER_RESPONSE_TYPE]	= { GTP_TRIG, GTP_EGRESS, gtpc_modify_bearer_response_hdl },
+	[GTP2C_ECHO_REQUEST]			= { GTP_INIT, GTP_INGRESS, gtpc_echo_request_hdl },
+	[GTP2C_CREATE_SESSION_REQUEST]	= { GTP_INIT, GTP_INGRESS, gtpc_create_session_request_hdl },
+	[GTP2C_CREATE_SESSION_RESPONSE]	= { GTP_TRIG, GTP_EGRESS, gtpc_create_session_response_hdl },
+	[GTP2C_DELETE_SESSION_REQUEST]	= { GTP_INIT, GTP_INGRESS, gtpc_delete_session_request_hdl },
+	[GTP2C_DELETE_SESSION_RESPONSE]	= { GTP_TRIG, GTP_EGRESS, gtpc_delete_session_response_hdl },
+	[GTP2C_MODIFY_BEARER_REQUEST]	= { GTP_INIT, GTP_INGRESS, gtpc_modify_bearer_request_hdl },
+	[GTP2C_MODIFY_BEARER_RESPONSE]	= { GTP_TRIG, GTP_EGRESS, gtpc_modify_bearer_response_hdl },
 	[GTP2C_DELETE_BEARER_REQUEST]		= { GTP_INIT, GTP_EGRESS, gtpc_delete_bearer_request_hdl },
 	[GTP2C_DELETE_BEARER_RESPONSE]		= { GTP_TRIG, GTP_INGRESS, gtpc_delete_bearer_response_hdl },
 	/* Generic command xlat */
@@ -1227,7 +1400,7 @@ gtpc_switch_handle_v2(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 	gtp_teid_t *teid;
 
 	/* Ignore echo-response messages */
-	if (gtph->type == GTP2C_ECHO_RESPONSE_TYPE)
+	if (gtph->type == GTP2C_ECHO_RESPONSE)
 		return NULL;
 
 	/* Special care to create and delete session */

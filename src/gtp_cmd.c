@@ -62,7 +62,7 @@ gtp_cmd_build_gtp_v1(gtp_cmd_args_t *args)
 	gtph->version = 1;
 	gtph->protocoltype = 1;
 	gtph->seq = 1;
-	gtph->type = GTP1C_ECHO_REQUEST_TYPE;
+	gtph->type = GTP1C_ECHO_REQUEST;
 	gtph->length = htons(sizeof(gtp1_ie_recovery_t) + 4);
 	gtph->sqn = htons(args->sqn++);
 	tot_len = sizeof(gtp1_hdr_t) + ntohs(gtph->length);
@@ -94,7 +94,7 @@ gtp_cmd_build_gtp_v2(gtp_cmd_args_t *args)
 	size_t tot_len;
 
 	gtph->version = 2;
-	gtph->type = GTP2C_ECHO_REQUEST_TYPE;
+	gtph->type = GTP2C_ECHO_REQUEST;
 	gtph->length = htons(sizeof(gtp_ie_recovery_t) + 4);
 	tot_len = hlen + ntohs(gtph->length) - 4;
 
@@ -258,7 +258,7 @@ gtp_cmd_read_thread(thread_ref_t thread)
 	}
 
 	gtph = (gtp_hdr_t *) (args->buffer + offset);
-	vty_send_out(vty, "%s", (gtph->type == GTP1C_ECHO_RESPONSE_TYPE || gtph->type == GTP2C_ECHO_RESPONSE_TYPE) ? "!" : "?");
+	vty_send_out(vty, "%s", (gtph->type == GTP1C_ECHO_RESPONSE || gtph->type == GTP2C_ECHO_RESPONSE) ? "!" : "?");
 
 	log_message(LOG_INFO, "%s(): Receiving GTPv%d Echo-Response from remote-peer [%s]:%d"
 			    , __FUNCTION__

@@ -182,7 +182,7 @@ gtp1_echo_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 	gtp1_ie_recovery_t *rec;
 
 	/* 3GPP.TS.129.060 7.2.2 : IE Recovery is mandatory in response message */
-	h->type = GTP1C_ECHO_RESPONSE_TYPE;
+	h->type = GTP1C_ECHO_RESPONSE;
 	h->length = htons(ntohs(h->length) + sizeof(gtp1_ie_recovery_t));
 	pkt_buffer_set_end_pointer(w->pbuff, gtp1_get_header_len(h));
 	pkt_buffer_set_data_pointer(w->pbuff, gtp1_get_header_len(h));
@@ -798,7 +798,7 @@ static const struct {
 	uint8_t family; /* GTP_INIT : Initial | GTP_TRIG : Triggered*/
 	gtp_teid_t * (*hdl) (gtp_server_worker_t *, struct sockaddr_storage *);
 } gtpc_msg_hdl[0xff + 1] = {
-	[GTP1C_ECHO_REQUEST_TYPE]			= { GTP_INIT, gtp1_echo_request_hdl },
+	[GTP1C_ECHO_REQUEST]			= { GTP_INIT, gtp1_echo_request_hdl },
 	[GTP1C_CREATE_PDP_CONTEXT_REQUEST]	= { GTP_INIT, gtp1_create_pdp_request_hdl },
 	[GTP1C_CREATE_PDP_CONTEXT_RESPONSE]	= { GTP_TRIG, gtp1_create_pdp_response_hdl },
 	[GTP1C_UPDATE_PDP_CONTEXT_REQUEST]	= { GTP_INIT, gtp1_update_pdp_request_hdl },
@@ -814,7 +814,7 @@ gtpc_switch_handle_v1(gtp_server_worker_t *w, struct sockaddr_storage *addr)
 	gtp_teid_t *teid;
 
 	/* Ignore echo-response messages */
-	if (gtph->type == GTP1C_ECHO_RESPONSE_TYPE)
+	if (gtph->type == GTP1C_ECHO_RESPONSE)
 		return NULL;
 
 	if (*(gtpc_msg_hdl[gtph->type].hdl)) {

@@ -595,20 +595,30 @@ DEFUN(apn,
 	return CMD_SUCCESS;
 }
 
-DEFUN(apn_realm,
-      apn_realm_cmd,
-      "realm STRING",
-      "Set Global PDN Realm\n"
-      "name\n")
+DEFUN(apn_plmn,
+      apn_plmn_cmd,
+      "plmn STRING",
+      "Set PDN PLMN\n"
+      "plmn\n")
 {
         gtp_apn_t *apn = vty->index;
+	uint8_t plmn_wo_bcd[GTP_PLMN_MAX_LEN];
 
 	if (argc < 1) {
 		vty_out(vty, "%% missing arguments%s", VTY_NEWLINE);
 		return CMD_WARNING;
 	}
 
-	strncpy(apn->realm, argv[0], GTP_REALM_LEN-1);
+
+	str_plmn_to_bcd(argv[0], apn->plmn.plmn, GTP_PLMN_MAX_LEN);
+	bcd_buffer_swap(apn->plmn.plmn, GTP_PLMN_MAX_LEN, plmn_wo_bcd);
+	/* if 5 digits PLMN */
+	if((plmn_wo_bcd[1] & 0x0f)  == 0x0f){
+		snprintf(apn->realm, 128, "apn.epc.mnc0%hhu%hhu.mcc%hhu%hhu%hhu.3gppnetwork.org.", apn->plmn.plmn[2] & 0x0f, apn->plmn.plmn[2] >> 4, apn->plmn.plmn[0] & 0x0f, apn->plmn.plmn[0] >> 4, apn->plmn.plmn[1] & 0x0f);
+	}else{
+		snprintf(apn->realm, 128, "apn.epc.mnc%hhu%hhu%hhu.mcc%hhu%hhu%hhu.3gppnetwork.org.", apn->plmn.plmn[1] >> 4, apn->plmn.plmn[2] & 0x0f, apn->plmn.plmn[2] >> 4, apn->plmn.plmn[0] & 0x0f, apn->plmn.plmn[0] >> 4, apn->plmn.plmn[1] & 0x0f);
+	}
+
 	apn_resolv_cache_realloc(apn);
 
 	return CMD_SUCCESS;
@@ -1530,8 +1540,6 @@ apn_config_write(vty_t *vty)
 					   , bcd_plmn_to_int64(apn->egci_plmn.plmn, GTP_PLMN_MAX_LEN));
 			vty_out(vty, "%s", VTY_NEWLINE);
 		}
-		if (apn->realm[0])
-			vty_out(vty, " realm %s%s", apn->realm, VTY_NEWLINE);
 		if (__test_bit(GTP_RESOLV_FL_SERVICE_SELECTION, &apn->flags))
 			apn_service_selection_config_write(vty, apn);
 		apn_config_imsi_match(vty, apn);
@@ -1559,6 +1567,10 @@ apn_config_write(vty_t *vty)
 			vty_out(vty, " gtp-session-uniq-pdn-type-per-imsi%s"
 				   , VTY_NEWLINE);
 		gtp_apn_hplmn_vty(vty, apn);
+		vty_out(vty, " plmn %ld%s"
+			, bcd_plmn_to_int64(apn->plmn.plmn, GTP_PLMN_MAX_LEN)
+			, VTY_NEWLINE);
+
 
 		vty_out(vty, "!%s", VTY_NEWLINE);
         }
@@ -1583,7 +1595,7 @@ gtp_apn_vty_init(void)
 	install_element(APN_NODE, &apn_nameserver_timeout_cmd);
 	install_element(APN_NODE, &apn_resolv_max_retry_cmd);
 	install_element(APN_NODE, &apn_resolv_cache_update_cmd);
-	install_element(APN_NODE, &apn_realm_cmd);
+	install_element(APN_NODE, &apn_plmn_cmd);
 	install_element(APN_NODE, &apn_realm_dynamic_cmd);
 	install_element(APN_NODE, &apn_tag_uli_with_serving_node_ip4_cmd);
 	install_element(APN_NODE, &apn_no_tag_uli_with_serving_node_ip4_cmd);

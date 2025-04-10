@@ -416,7 +416,7 @@ gtpu_ipip_traffic_selector(struct parse_pkt *pkt)
 		return XDP_DROP;
 
 	/* Punt into netstack GTP-U echo request */
-	if (gtph->type == GTPU_ECHO_REQ_TYPE)
+	if (gtph->type == GTPU_ECHO_REQ)
 		return XDP_PASS;
 
 	return gtpu_ipip_decap(pkt, iptnl_rule, NULL);
