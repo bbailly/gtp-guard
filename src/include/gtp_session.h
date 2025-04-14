@@ -46,6 +46,7 @@ typedef struct _gtp_session {
 	uint8_t			*imsi;		/* original imsi */	
 	uint8_t			ptype;
 	gtp_plmn_t		serving_plmn;
+	rat_type_t		rat;
 
 	gtp_apn_t		*apn;
 	list_head_t		gtpc_teid;

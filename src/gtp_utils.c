@@ -822,45 +822,45 @@ gtp_flags2str(char *str, size_t str_len, unsigned long flags)
 /*
  *	MSG Types defs
  */
-// static const gtp_msg_type_map_t gtp1c_msg_type2str[0xff] = {
-// 	[GTP1C_ECHO_REQUEST] = {
-// 		.name = "GTP1C_ECHO_REQUEST",
-// 		.description = "Used to check GTP control-plane connectivity between two nodes."
-// 	},
-// 	[GTP1C_ECHO_RESPONSE] = {
-// 		 .name = "GTP1C_ECHO_RESPONSE",
-// 		 .description = "Response confirming connectivity to a GTP Echo Request."
-// 	},
-// 	[GTP1C_VERSION_NOT_SUPPORTED_INDICATION] = {
-// 		 .name = "GTP1C_VERSION_NOT_SUPPORTED_INDICATION",
-// 		 .description = "Indicates that the requested GTP version is not supported."
-// 	},
-// 	[GTP1C_CREATE_PDP_CONTEXT_REQUEST] = {
-// 		.name = "GTP1C_CREATE_PDP_CONTEXT_REQUEST",
-// 		.description = "Requests the creation of a PDP context for a subscriber session."
-// 	},
-// 	[GTP1C_CREATE_PDP_CONTEXT_RESPONSE] = {
-// 		.name = "GTP1C_CREATE_PDP_CONTEXT_RESPONSE",
-// 		.description = "Returns acceptance or rejection of a Create PDP Context Request."
-// 	},
-// 	[GTP1C_UPDATE_PDP_CONTEXT_REQUEST] = {
-// 		.name = "GTP1C_UPDATE_PDP_CONTEXT_REQUEST",
-// 		.description = "Requests modification of an existing PDP context."
-// 	},
-// 	[GTP1C_UPDATE_PDP_CONTEXT_RESPONSE] = {
-// 		.name = "GTP1C_UPDATE_PDP_CONTEXT_RESPONSE",
-// 		.description = "Returns acceptance or rejection of an Update PDP Context Request."
-// 	},
-// 	[GTP1C_DELETE_PDP_CONTEXT_REQUEST] = {
-// 		.name = "GTP1C_DELETE_PDP_CONTEXT_REQUEST",
-// 		.description = "Requests deletion of an existing PDP context."
-// 	},
-// 	[GTP1C_DELETE_PDP_CONTEXT_RESPONSE] = {
-// 		.name = "GTP1C_DELETE_PDP_CONTEXT_RESPONSE",
-// 		.description = "Returns acceptance or rejection of a Delete PDP Context Request."
-// 	},
-// 	/* any non listed records: 0 initialiazed */
-// };
+const gtp_msg_type_map_t gtp1c_msg_type2str[0xff] = {
+ 	[GTP1C_ECHO_REQUEST] = {
+ 		.name = "GTP1C_ECHO_REQUEST",
+ 		.description = "Used to check GTP control-plane connectivity between two nodes."
+ 	},
+ 	[GTP1C_ECHO_RESPONSE] = {
+ 		 .name = "GTP1C_ECHO_RESPONSE",
+ 		 .description = "Response confirming connectivity to a GTP Echo Request."
+ 	},
+ 	[GTP1C_VERSION_NOT_SUPPORTED_INDICATION] = {
+ 		 .name = "GTP1C_VERSION_NOT_SUPPORTED_INDICATION",
+ 		 .description = "Indicates that the requested GTP version is not supported."
+ 	},
+ 	[GTP1C_CREATE_PDP_CONTEXT_REQUEST] = {
+ 		.name = "GTP1C_CREATE_PDP_CONTEXT_REQUEST",
+ 		.description = "Requests the creation of a PDP context for a subscriber session."
+ 	},
+ 	[GTP1C_CREATE_PDP_CONTEXT_RESPONSE] = {
+ 		.name = "GTP1C_CREATE_PDP_CONTEXT_RESPONSE",
+ 		.description = "Returns acceptance or rejection of a Create PDP Context Request."
+ 	},
+ 	[GTP1C_UPDATE_PDP_CONTEXT_REQUEST] = {
+ 		.name = "GTP1C_UPDATE_PDP_CONTEXT_REQUEST",
+ 		.description = "Requests modification of an existing PDP context."
+ 	},
+ 	[GTP1C_UPDATE_PDP_CONTEXT_RESPONSE] = {
+ 		.name = "GTP1C_UPDATE_PDP_CONTEXT_RESPONSE",
+ 		.description = "Returns acceptance or rejection of an Update PDP Context Request."
+ 	},
+ 	[GTP1C_DELETE_PDP_CONTEXT_REQUEST] = {
+ 		.name = "GTP1C_DELETE_PDP_CONTEXT_REQUEST",
+ 		.description = "Requests deletion of an existing PDP context."
+ 	},
+ 	[GTP1C_DELETE_PDP_CONTEXT_RESPONSE] = {
+ 		.name = "GTP1C_DELETE_PDP_CONTEXT_RESPONSE",
+ 		.description = "Returns acceptance or rejection of a Delete PDP Context Request."
+ 	},
+ 	/* any non listed records: 0 initialiazed */
+};
 
 const gtp_msg_type_map_t gtp2c_msg_type2str[0xff] = {
 	[GTP2C_ECHO_REQUEST] = {
@@ -1038,11 +1038,11 @@ gtp_msgtype2str(int type, int idx)
  */
 const gtp_msg_type_map_t gtp1c_msg_cause2str[0xff] = {
 	[GTP1C_CAUSE_REQUEST_ACCEPTED] = {
-		.name = "GTP1C_CAUSE_REQUEST_ACCEPTED",
+		.name = "REQUEST_ACCEPTED",
 		.description = "Cause (GTPv1): request accepted by the receiving node."
 	},
 	[GTP1C_CAUSE_NON_EXISTENT] = {
-		.name = "GTP1C_CAUSE_NON_EXISTENT",
+		.name = "NON_EXISTENT",
 		.description = "Cause (GTPv1): requested resource or context doesn't exist."
 	},
 	/* any non listed records: 0 initialiazed */
@@ -1050,55 +1050,63 @@ const gtp_msg_type_map_t gtp1c_msg_cause2str[0xff] = {
 
 const gtp_msg_type_map_t gtp2c_msg_cause2str[0xff] = {
 	[GTP2C_CAUSE_REQUEST_ACCEPTED] = {
-		.name = "GTP2C_CAUSE_REQUEST_ACCEPTED",
+		.name = "REQUEST_ACCEPTED",
 		.description = "Cause: request accepted by the receiving node."
 	},
+	[GTP2C_CAUSE_NEW_PDN_TYPE_DUE_TO_NETWORK_PREFERENCE] = {
+		.name = "NEW_PDN_TYPE_DUE_TO_NETWORK_PREFERENCE",
+		.description = "Cause: New PDN type due to network preference."
+	},
 	[GTP2C_CAUSE_CONTEXT_NOT_FOUND] = {
-		.name = "GTP2C_CAUSE_CONTEXT_NOT_FOUND",
+		.name = "CONTEXT_NOT_FOUND",
 		.description = "Cause: session or context not found for the request."
 	},
 	[GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN] = {
-		.name = "GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN",
+		.name = "MISSING_OR_UNKNOWN_APN",
 		.description = "Cause: the APN is missing or not recognized by the network."
 	},
 	[GTP2C_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED] = {
-		.name = "GTP2C_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED",
+		.name = "ALL_DYNAMIC_ADDRESS_OCCUPIED",
 		.description = "Cause: no free IP addresses left to assign (all in use)."
 	},
 	[GTP2C_CAUSE_USER_AUTH_FAILED] = {
-		.name = "GTP2C_CAUSE_USER_AUTH_FAILED",
+		.name = "USER_AUTH_FAILED",
 		.description = "Cause: user authentication procedure failed."
 	},
 	[GTP2C_CAUSE_APN_ACCESS_DENIED] = {
-		.name = "GTP2C_CAUSE_APN_ACCESS_DENIED",
+		.name = "APN_ACCESS_DENIED",
 		.description = "Cause: access to the requested APN is denied."
 	},
 	[GTP2C_CAUSE_REQUEST_REJECTED] = {
-		.name = "GTP2C_CAUSE_REQUEST_REJECTED",
+		.name = "REQUEST_REJECTED",
 		.description = "Cause: the request was rejected (general failure)."
 	},
 	[GTP2C_CAUSE_IMSI_IMEI_NOT_KNOWN] = {
-		.name = "GTP2C_CAUSE_IMSI_IMEI_NOT_KNOWN",
+		.name = "IMSI_IMEI_NOT_KNOWN",
 		.description = "Cause: the IMSI or IMEI is not recognized by the network."
 	},
 	[GTP2C_CAUSE_INVALID_PEER] = {
-		.name = "GTP2C_CAUSE_INVALID_PEER",
+		.name = "INVALID_PEER",
 		.description = "Cause: the peer node is invalid or not allowed."
 	},
+	[GTP2C_CAUSE_TEMPORARILY_REJECTED_DUE_TO_HANDOVER] = {
+		.name = "TEMPORARILY_REJECTED_DUE_TO_HANDOVER",
+		.description = "Cause: temporarily rejected because of TAU or handover in progress."
+	},
 	[GTP2C_CAUSE_APN_CONGESTION] = {
-		.name = "GTP2C_CAUSE_APN_CONGESTION",
+		.name = "APN_CONGESTION",
 		.description = "Cause: the APN is congested."
 	},
 	[GTP2C_CAUSE_MULTIPLE_PDN_NOT_ALLOWED] = {
-		.name = "GTP2C_CAUSE_MULTIPLE_PDN_NOT_ALLOWED",
+		.name = "MULTIPLE_PDN_NOT_ALLOWED",
 		.description = "Cause: subscriber restricted to a single PDN connection."
 	},
 	[GTP2C_CAUSE_TIMED_OUT_REQUEST] = {
-		.name = "GTP2C_CAUSE_TIMED_OUT_REQUEST",
+		.name = "TIMED_OUT_REQUEST",
 		.description = "Cause: no response before the request timed out."
 	},
 	[GTP2C_CAUSE_5GC_NOT_ALLOWED] = {
-		.name = "GTP2C_CAUSE_5GC_NOT_ALLOWED",
+		.name = "5GC_NOT_ALLOWED",
 		.description = "Cause: requested 5G Core functionality not allowed."
 	},
 	/* any non listed records: 0 initialiazed */
@@ -1111,7 +1119,7 @@ gtp2c_cause2str(int idx)
 	if (gtp2c_msg_cause2str[idx].name)
 		return gtp2c_msg_cause2str[idx].name;
 
-	return "bad cause";
+	return "unknown cause";
 }
 
 const char *
@@ -1120,6 +1128,40 @@ gtp1c_cause2str(int idx)
 	if (gtp1c_msg_cause2str[idx].name)
 		return gtp1c_msg_cause2str[idx].name;
 
-	return "bad cause";
+	return "unknown cause";
 }
+
+const gtp_msg_type_map_t gtp_session_type2str[SESSIONTYPE_ENUM_SIZE] = {
+	[SESSIONTYPE_GTPP_TO_PGW] = {
+		.name = "GTPP_TO_PGW",
+		.description = "A session between GTP Guard acting as GTPP and a PGW"
+	},
+	[SESSIONTYPE_GTPP_TO_SGW] = {
+		.name = "GTPP_TO_SGW",
+		.description = "A session between GTP Guard acting as GTPP and a SGW"
+	},
+};
+
+const gtp_msg_type_map_t gtp_session_rattype2str[RATTYPE_ENUM_SIZE] = {
+	[RATTYPE_UTRAN] = {
+		.name = "UTRAN",
+		.description = "A UTRAN session"
+	},
+	[RATTYPE_GERAN] = {
+		.name = "GERAN",
+		.description = "A GERAN session"
+	},
+	[RATTYPE_WLAN] = {
+		.name = "WLAN",
+		.description = "A WLAN session"
+	},
+	[RATTYPE_EUTRAN] = {
+		.name = "EUTRAN",
+		.description = "A EUTRAN session"
+	},
+	[RATTYPE_NR] = {
+		.name = "NR",
+		.description = "A NR session"
+	},
+};
 

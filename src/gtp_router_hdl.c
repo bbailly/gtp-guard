@@ -998,9 +998,8 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	s->imsi = MALLOC(sizeof(ie_imsi->imsi));
 	memcpy(s->imsi, ie_imsi->imsi, sizeof(ie_imsi->imsi));
 
-	msg_ie = gtp_msg_ie_get(msg, GTP_IE_SERVING_NETWORK_TYPE);
-	if(msg_ie){
-		gtp_ie_serving_network_t* serving_network = (gtp_ie_serving_network_t*) msg_ie;
+	gtp_ie_serving_network_t* serving_network = (gtp_ie_serving_network_t*) gtp_msg_ie_get(msg, GTP_IE_SERVING_NETWORK_TYPE);
+	if(serving_network){
 		memcpy(s->serving_plmn.plmn,serving_network->mcc_mnc, sizeof(serving_network->mcc_mnc));
 		char splmn_s[7];
 		plmn_bcd_to_string(s->serving_plmn.plmn, splmn_s);

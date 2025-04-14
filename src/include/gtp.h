@@ -112,6 +112,7 @@ typedef enum _gtp_roaming_status {
 
 /* GTP-C v2 Cause */
 #define GTP2C_CAUSE_REQUEST_ACCEPTED			16
+#define GTP2C_CAUSE_NEW_PDN_TYPE_DUE_TO_NETWORK_PREFERENCE	18
 #define GTP2C_CAUSE_CONTEXT_NOT_FOUND			64
 #define GTP2C_CAUSE_MISSING_OR_UNKNOWN_APN		78
 #define GTP2C_CAUSE_ALL_DYNAMIC_ADDRESS_OCCUPIED	84
@@ -120,6 +121,7 @@ typedef enum _gtp_roaming_status {
 #define GTP2C_CAUSE_REQUEST_REJECTED			94
 #define GTP2C_CAUSE_IMSI_IMEI_NOT_KNOWN			96
 #define GTP2C_CAUSE_INVALID_PEER			109
+#define GTP2C_CAUSE_TEMPORARILY_REJECTED_DUE_TO_HANDOVER	110
 #define GTP2C_CAUSE_APN_CONGESTION			113
 #define GTP2C_CAUSE_MULTIPLE_PDN_NOT_ALLOWED		116
 #define GTP2C_CAUSE_TIMED_OUT_REQUEST			122
@@ -143,8 +145,6 @@ typedef enum _gtp_roaming_status {
 #define GTPU_FL_E					(1 << 2)
 #define GTPU_FL_PT					(1 << 4)
 #define GTPU_FL_V					(1 << 5)
-
-typedef uint8_t plmn_t[3];
 
 /*
  *	GTP1 IE
@@ -396,7 +396,7 @@ typedef struct _gtp_ie_paa {
 #define GTP_IE_RAT_TYPE_TYPE				82
 typedef struct _gtp_ie_rat_type {
 	gtp_ie_t	h;
-	uint8_t		mcc_mnc[3];
+	uint8_t		rat_type;
 } __attribute__((packed)) gtp_ie_rat_type_t;
 
 #define GTP_IE_SERVING_NETWORK_TYPE			83

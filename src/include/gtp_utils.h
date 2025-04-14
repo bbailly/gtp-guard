@@ -75,7 +75,11 @@ extern gtp_roaming_status_t gtp_get_roaming_status(uint8_t *, uint8_t *, list_he
 
 extern ssize_t gtpu_get_header_len(pkt_buffer_t *);
 
+extern const gtp_msg_type_map_t gtp1c_msg_type2str[0xff];
+extern const gtp_msg_type_map_t gtp1c_msg_cause2str[0xff];
 extern const gtp_msg_type_map_t gtp2c_msg_type2str[0xff];
 extern const gtp_msg_type_map_t gtp2c_msg_cause2str[0xff];
+extern const gtp_msg_type_map_t gtp_session_type2str[SESSIONTYPE_ENUM_SIZE];
+extern const gtp_msg_type_map_t gtp_session_rattype2str[RATTYPE_ENUM_SIZE];
 
 #endif

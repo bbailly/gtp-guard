@@ -228,6 +228,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	uint64_t imsi;
 	uint8_t *cp;
 	gtp_ie_serving_network_t *serving_network;
+	gtp_ie_rat_type_t *rat_type;
 	char apn_str[64];
 	char apn_plmn[64];
 	int err;
@@ -250,6 +251,15 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (!serving_network) {
 		log_message(LOG_INFO, "%s(): no Serving Network IE present. ignoring..."
 				    , __FUNCTION__);
+		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
+		return NULL;
+	}
+
+	/* RAT type */
+	rat_type = (gtp_ie_rat_type_t *) gtp_get_ie(GTP_IE_RAT_TYPE_TYPE, w->pbuff);
+	if (!rat_type) {
+		log_message(LOG_INFO, "%s(): no RAT type IE present. ignoring..."
+					, __FUNCTION__);
 		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
 		return NULL;
 	}
@@ -319,6 +329,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		s->w = w;
 		s->imsi = MALLOC(sizeof(ie_imsi->imsi));
 		memcpy(s->imsi, ie_imsi->imsi, sizeof(ie_imsi->imsi));
+		s->rat = rat_type->rat_type;
 	}
 
 	/* Rewrite IMSI if needed */
@@ -344,7 +355,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		gtp_stats_gtp_signalling_inc_dropped(&w->stats, s->serving_plmn.plmn, addr, h->version, h->type);
 		goto end;
 	}
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
 
 
 	/* Set Serving PLMN */
@@ -371,7 +382,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 	if (retransmit) {
 		gtp_sqn_masq(w, teid);
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 		goto end;
 	}
 
@@ -388,7 +399,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	/* pGW selection */
 	if (__test_bit(GTP_FL_FORCE_PGW_BIT, &ctx->flags)) {
 		teid->pgw_addr = *(struct sockaddr_in *) &ctx->pgw_addr;
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 		goto end;
 	}
 
@@ -408,7 +419,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 			gtp_session_destroy(s);
 			teid = NULL;
 		}else{
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);	
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 		}
 
 		goto end;
@@ -423,7 +434,7 @@ gtpc_create_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		gtp_session_destroy(s);
 		teid = NULL;
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 	}
 
   end:
@@ -455,11 +466,11 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 			return NULL;
 		}
 
-		cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
-		if (cp) {
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+		ie_cause = (gtp_ie_cause_t *) gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
+		if (ie_cause) {
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, &ie_cause->value);
 		}else{
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
 		}
 
 		/* IMSI rewrite if needed */
@@ -499,7 +510,7 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 
 		/* Force delete session */
 		t->session->action = GTP_ACTION_DELETE_SESSION;
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, NULL, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, NULL, addr, h->version, DIR_RX, h->type, NULL);
 
 		goto end;
 	}
@@ -529,14 +540,24 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 	cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
 	if (cp) {
 		ie_cause = (gtp_ie_cause_t *) cp;
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, &ie_cause->value);
 		if (!(ie_cause->value >= 16 && ie_cause->value <= 63)) {
 			teid->session->action = GTP_ACTION_DELETE_SESSION;
+		}else{
+			/* update gauge to PGW */
+			gtp_stats_gtp_sessions_by_type_inc(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, SESSIONTYPE_GTPP_TO_PGW);
+			gtp_stats_gtp_sessions_by_rattype_inc(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, t->session->rat);
+
+			/* update gauge to SGW */
+			gtp_stats_gtp_sessions_by_type_inc(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, SESSIONTYPE_GTPP_TO_SGW);
+			gtp_stats_gtp_sessions_by_rattype_inc(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, t->session->rat);
 		}
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, &ie_cause->value);
+
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, NULL);
 	}
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
 
   end:
 	gtp_teid_put(t);
@@ -559,7 +580,6 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 				    , __FUNCTION__
 				    , ntohl(h->teid));
 		gtp_stats_gtp_signalling_inc_dropped(&w->stats, NULL, addr, h->version, h->type);
-    
 		return NULL;
 	}
 
@@ -577,9 +597,9 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	s = teid->session;
 
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
 	}
 
 	/* Update addr tunnel endpoint */
@@ -600,12 +620,12 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if (__test_bit(GTP_FL_SESSION_EXPIRATION_DELETE_TO_BIT, &ctx->flags))
 		gtp_session_mod_timer(s, ctx->session_delete_to);
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 
 	}
-	
+
 	return teid;
 }
 
@@ -635,7 +655,6 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 
 			return NULL;
 		}
-		
 
 		/* IMSI rewrite if needed */
 		cp = gtp_get_ie(GTP_IE_IMSI_TYPE, w->pbuff);
@@ -695,14 +714,22 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 		     ie_cause->value <= GTP2C_CAUSE_CONTEXT_NOT_FOUND) ||
 		    ie_cause->value == GTP2C_CAUSE_INVALID_PEER) {
 			teid->session->action = GTP_ACTION_DELETE_SESSION;
+
+			/* update gauge to PGW */
+			gtp_stats_gtp_sessions_by_type_dec(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, SESSIONTYPE_GTPP_TO_PGW);
+			gtp_stats_gtp_sessions_by_rattype_dec(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, s->rat);
+
+			/* update gauge to SGW */
+			gtp_stats_gtp_sessions_by_type_dec(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, SESSIONTYPE_GTPP_TO_SGW);
+			gtp_stats_gtp_sessions_by_rattype_dec(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, s->rat);
 		}
 	}
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause ? ie_cause->value : 0);
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, ie_cause ? ie_cause->value : 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, ie_cause ? &ie_cause->value : NULL);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, ie_cause ? &ie_cause->value : NULL);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause ? ie_cause->value : 0);
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, ie_cause ? ie_cause->value : 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, ie_cause ? &ie_cause->value : NULL);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, ie_cause ? &ie_cause->value : NULL);
 	}
 
 	return teid;
@@ -713,6 +740,7 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 {
 	gtp_hdr_t *h = (gtp_hdr_t *) w->pbuff->head;
 	gtp_ie_serving_network_t *ie_serving_network;
+	gtp_ie_rat_type_t *ie_rat_type = NULL;
 	gtp_server_t *srv = w->srv;
 	gtp_switch_t *ctx = srv->ctx;
 	gtp_teid_t *teid = NULL, *t, *t_u = NULL, *pteid;
@@ -747,6 +775,14 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	h->teid = teid->id;
 	s = teid->session;
 
+	/* Update RAT type */
+	ie_rat_type = (gtp_ie_rat_type_t*) gtp_get_ie(GTP_IE_RAT_TYPE_TYPE, w->pbuff);
+	if (ie_rat_type) {
+		gtp_stats_gtp_sessions_by_rattype_dec(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, s->rat);
+		gtp_stats_gtp_sessions_by_rattype_dec(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, s->rat);
+		s->rat = ie_rat_type->rat_type;
+	}
+
 	/* Update GTP-C with current sGW*/
 	gtp_teid_update_sgw(teid, addr);
 	gtp_teid_update_sgw(teid->peer_teid, addr);
@@ -758,6 +794,12 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		memcpy(s->serving_plmn.plmn, ie_serving_network->mcc_mnc, GTP_PLMN_MAX_LEN);
 	}
 
+	/* Update RAT type gauges */
+	if (ie_rat_type) {
+		gtp_stats_gtp_sessions_by_rattype_inc(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, s->rat);
+		gtp_stats_gtp_sessions_by_rattype_inc(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, s->rat);
+	}
+
 	/* Update session roaming status */
 	err = gtp_session_roaming_status_set(s);
 	if (err) {
@@ -766,7 +808,7 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 				    , s->conn->imsi);
 	}
 
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
 
 	/* ULI tag */
 	if (__test_bit(GTP_APN_FL_TAG_ULI_WITH_SERVING_NODE_IP4, &s->apn->flags) &&
@@ -787,13 +829,13 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	t = gtpc_session_xlat(w, s, direction);
 	if (!t) {
 		/* There is no GTP-C update, so just forward */
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 
 		return teid;
 	}
 
 	if (t->peer_teid){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &t->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &t->pgw_addr, h->version, DIR_TX, h->type, NULL);
 
 		goto end;
 	}
@@ -813,7 +855,7 @@ gtpc_modify_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		t->bearer_teid = t_u;
 		t_u->old_teid = (pteid) ? pteid->bearer_teid : NULL;
 	}
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 
   end:
 	gtp_teid_put(t);
@@ -846,7 +888,7 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		}
 
 		ie_cause = (gtp_ie_cause_t *) gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause?ie_cause->value : 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, ie_cause?&ie_cause->value : NULL);
 
 
 		/* IMSI rewrite if needed */
@@ -860,8 +902,8 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 		/* SQN masq */
 		gtp_sqn_restore(w, teid->peer_teid);
-		
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause?ie_cause->value : 0);
+
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, ie_cause?&ie_cause->value : NULL);
 
 
 		return teid;
@@ -883,8 +925,8 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	 * 3GPP.TS.29.274 8.4 */
 	cp = gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
 	if (!cp){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, NULL);
 
 		return teid;
 	}
@@ -892,20 +934,20 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 
 	/* If binding already exist then bearer update already done */
 	if (teid->peer_teid){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, &ie_cause->value);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, &ie_cause->value);
 		goto end;
 	}
 
 	oteid = teid->old_teid;
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, &ie_cause->value);
 
 	if (!(ie_cause->value >= GTP2C_CAUSE_REQUEST_ACCEPTED &&
 	      ie_cause->value <= 63)) {
 		if (oteid)
 			gtp_sqn_restore(w, oteid->peer_teid);
-		
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
+
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, &ie_cause->value);
 
 		return teid;
 	}
@@ -924,7 +966,7 @@ gtpc_modify_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 		gtp_session_gtpu_teid_destroy(oteid);
 	}
 
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, ie_cause->value);
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, &ie_cause->value);
 
   end:
 	/* SQN masq */
@@ -974,7 +1016,7 @@ gtpc_delete_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	h->teid = teid->id;
 	s = teid->session;
 
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
 
 
 	/* Msg from pGW, update pGW addr*/
@@ -983,7 +1025,7 @@ gtpc_delete_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 
 	cp = gtp_get_ie(GTP_IE_EPS_BEARER_ID_TYPE, w->pbuff);
 	if (!cp){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, NULL);
 
 		return teid;
 	}
@@ -994,7 +1036,7 @@ gtpc_delete_bearer_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	teid->action = GTP_ACTION_DELETE_BEARER;
 	gtp_session_set_delete_bearer(s, bearer_id);
 
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, NULL);
 
 	return teid;
 }
@@ -1045,13 +1087,19 @@ gtpc_delete_bearer_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 			if (ie_cause->value == GTP2C_CAUSE_CONTEXT_NOT_FOUND)
 				teid->session->action = GTP_ACTION_DELETE_SESSION;
 			gtp_session_destroy_bearer(s);
-		}
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, ie_cause->value);
-	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
-	}
+			gtp_stats_gtp_sessions_by_type_dec(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, SESSIONTYPE_GTPP_TO_PGW);
+			gtp_stats_gtp_sessions_by_rattype_dec(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, s->rat);
 
-	gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+			gtp_stats_gtp_sessions_by_type_dec(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, SESSIONTYPE_GTPP_TO_SGW);
+			gtp_stats_gtp_sessions_by_rattype_dec(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, s->rat);
+		}
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, &ie_cause->value);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, &ie_cause->value);
+	}else{
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, 0);
+
+	}
 
 	return teid;
 }
@@ -1136,9 +1184,9 @@ gtpc_generic_xlat_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 	s = teid->session;
 
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
 	}
 
 	/* Update addr */
@@ -1152,9 +1200,9 @@ gtpc_generic_xlat_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 	}
 
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, 0);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, 0);
 	}
 
 	return teid;
@@ -1197,9 +1245,9 @@ gtpc_generic_xlat_command_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 	s = teid->session;
 
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
 	}
 
 
@@ -1218,9 +1266,9 @@ gtpc_generic_xlat_command_hdl(gtp_server_worker_t *w, struct sockaddr_storage *a
 	}
 
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, 0);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, 0);
 	}
 
 	return teid;
@@ -1263,14 +1311,13 @@ gtpc_generic_xlat_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 		gtp_sqn_restore(w, teid->peer_teid);
 
 		if(direction == GTP_INGRESS){
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, 0);
 
 		}else{
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, 0);
 		}
-	
 		return teid;
 	}
 
@@ -1288,9 +1335,9 @@ gtpc_generic_xlat_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	s = teid->session;
 
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, dir_rx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, 0);
 	}
 
 	/* Performing session translation */
@@ -1301,9 +1348,9 @@ gtpc_generic_xlat_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage *
 	}
 
 	if(direction == GTP_INGRESS){
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, 0);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, dir_tx, h->type, 0);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, 0);
 	}
 
 	return teid;
