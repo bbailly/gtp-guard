@@ -468,9 +468,9 @@ gtpc_create_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 
 		ie_cause = (gtp_ie_cause_t *) gtp_get_ie(GTP_IE_CAUSE_TYPE, w->pbuff);
 		if (ie_cause) {
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, &ie_cause->value);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, t->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, &ie_cause->value);
 		}else{
-			gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
+			gtp_stats_gtp_signalling_inc_counter(&w->stats, t->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, NULL);
 		}
 
 		/* IMSI rewrite if needed */
@@ -622,7 +622,7 @@ gtpc_delete_session_request_hdl(gtp_server_worker_t *w, struct sockaddr_storage 
 	if(direction == GTP_INGRESS){
 		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
 	}else{
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, NULL);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, s->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, NULL);
 
 	}
 
@@ -729,7 +729,7 @@ gtpc_delete_session_response_hdl(gtp_server_worker_t *w, struct sockaddr_storage
 		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, ie_cause ? &ie_cause->value : NULL);
 	}else{
 		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->apn->plmn.plmn, addr, h->version, DIR_RX, h->type, ie_cause ? &ie_cause->value : NULL);
-		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->pgw_addr, h->version, DIR_TX, h->type, ie_cause ? &ie_cause->value : NULL);
+		gtp_stats_gtp_signalling_inc_counter(&w->stats, teid->session->serving_plmn.plmn, (struct sockaddr_storage *) &teid->sgw_addr, h->version, DIR_TX, h->type, ie_cause ? &ie_cause->value : NULL);
 	}
 
 	return teid;
