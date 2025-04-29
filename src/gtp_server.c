@@ -210,6 +210,13 @@ gtp_server_worker_destroy(gtp_server_worker_t *w)
 {
 	list_head_del(&w->next);
 	pkt_buffer_free(w->pbuff);
+	gtp_htab_destroy(w->stats.signalling_gtp->plmns);
+	gtp_htab_destroy(w->stats.signalling_pppoe->instances);
+	FREE(w->stats.signalling_pppoe->instances);
+	FREE(w->stats.signalling_gtp->plmns);
+	FREE(w->stats.signalling_pppoe);
+	FREE(w->stats.signalling_gtp);
+
 	FREE(w);
 	return 0;
 }

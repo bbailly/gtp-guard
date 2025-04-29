@@ -152,15 +152,15 @@ int plmn_string_to_bcd(const char* plmn_s, uint8_t * plmn){
 	uint32_t plmn_i = strtol(plmn_s,NULL,16);
 
 	if(strlen(plmn_s) == 5){
-		plmn[0] = ((plmn_i & 0xf0000) >> 16) + ((plmn_i & 0x0f000) >> 8);
-		plmn[1] = ((plmn_i & 0x00f00) >> 8) + 0xf0;
-		plmn[2] = ((plmn_i & 0x000f0) >> 4) + ((plmn_i & 0x0000f) << 4);
+		plmn[0] = ((plmn_i & 0x0f000) >> 8) | ((plmn_i & 0xf0000) >> 16);
+		plmn[1] = 0xf0 | ((plmn_i & 0x00f00) >> 8);
+		plmn[2] = ((plmn_i & 0x0000f) << 4) | ((plmn_i & 0x000f0) >> 4);
 	}else{
-		plmn[0] = ((plmn_i & 0xf00000) >> 20) + ((plmn_i & 0x0f0000) >> 12);
-		plmn[1] = ((plmn_i & 0x00f000) >> 12) + ((plmn_i & 0x000f00) >> 4);
-		plmn[2] = ((plmn_i & 0x0000f0) >> 4) + ((plmn_i & 0x00000f) << 4);
-
+		plmn[0] = ((plmn_i & 0x0f0000) >> 12) | ((plmn_i & 0xf00000) >> 20);
+		plmn[1] = ((plmn_i & 0x00000f) << 4) | ((plmn_i & 0x00f000) >> 12);
+		plmn[2] = (plmn_i & 0x0000f0) | ((plmn_i & 0x000f00) >> 8);
 	}
+
 	return 0;
 }
 
@@ -168,7 +168,7 @@ int plmn_bcd_to_string(const uint8_t * plmn, char * plmn_s){
 	if(!((plmn[0] & 0xf0) > 0x90 || (plmn[0] & 0x0f) > 0x09 || (plmn[1] & 0x0f) > 0x09 || (plmn[2] & 0xf0) > 0x90 || (plmn[2] & 0x0f) > 0x09) && (plmn[1] & 0xf0) == 0xf0){
 		return sprintf(plmn_s, "%x%x%x%x%x", plmn[0] & 0x0f, (plmn[0] & 0xf0) >> 4, plmn[1] & 0x0f, plmn[2] & 0x0f, (plmn[2] & 0xf0) >> 4);
 	}
-	return sprintf(plmn_s, "%x%x%x%x%x%x", plmn[0] & 0x0f, (plmn[0] & 0xf0) >> 4, plmn[1] & 0x0f, (plmn[1] & 0xf0) >> 4, plmn[2] & 0x0f, (plmn[2] & 0xf0) >> 4);
+	return sprintf(plmn_s, "%x%x%x%x%x%x", plmn[0] & 0x0f, (plmn[0] & 0xf0) >> 4, plmn[1] & 0x0f, plmn[2] & 0x0f, (plmn[2] & 0xf0) >> 4, (plmn[1] & 0xf0) >> 4);
 }
 
 int
