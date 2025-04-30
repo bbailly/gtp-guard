@@ -538,6 +538,11 @@ gtp_sessions_free(gtp_conn_t *c)
 	list_for_each_entry_safe(s, _s, l, next) {
 		__gtp_session_teid_destroy(s);
 		list_head_del(&s->next);
+
+		/* Release IMSI buffer */
+		if(s->imsi)
+			FREE(s->imsi);
+
 		FREE(s);
 	}
 	pthread_mutex_unlock(&c->session_mutex);

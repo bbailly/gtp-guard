@@ -11,6 +11,14 @@
 #define STATS_GTP_IP_HASHTAB_SIZE  (1 << STATS_GTP_IP_HASHTAB_BITS)
 #define STATS_GTP_IP_HASHTAB_MASK  (STATS_GTP_IP_HASHTAB_SIZE - 1)
 
+/* PPPoE Hash table */
+#define STATS_GTP_PPPOE_HASHTAB_BITS  10
+#define STATS_GTP_PPPOE_HASHTAB_SIZE  (1 << STATS_GTP_PPPOE_HASHTAB_BITS)
+#define STATS_GTP_PPPOE_HASHTAB_MASK  (STATS_GTP_PPPOE_HASHTAB_SIZE - 1)
+
+#define STATS_GTP_SIZE	0xff
+
+
 typedef enum _metric_type {
 	METRIC_SIGNALLING,
 	METRIC_USERPLAN,
@@ -58,20 +66,20 @@ typedef struct _gtp_stats {
 
 typedef struct _gtp_gtp_stats {
 	/* gtp_stats_t SHALL be first */
-	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
-	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
-	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
-	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
+	gtp_stats_t		v1_rx[STATS_GTP_SIZE]; /* GTPv1 RX stats */
+	gtp_stats_t		v1_tx[STATS_GTP_SIZE]; /* GTPv1 TX stats */
+	gtp_stats_t		v2_rx[STATS_GTP_SIZE]; /* GTPv2 RX stats */
+	gtp_stats_t		v2_tx[STATS_GTP_SIZE]; /* GTPv2 TX stats */
 
 } gtp_gtp_stats_t;
 
 
 typedef struct _gtp_ip_stats {
 	/* gtp_stats_t SHALL be first */
-	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
-	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
-	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
-	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
+	gtp_stats_t		v1_rx[STATS_GTP_SIZE]; /* GTPv1 RX stats */
+	gtp_stats_t		v1_tx[STATS_GTP_SIZE]; /* GTPv1 TX stats */
+	gtp_stats_t		v2_rx[STATS_GTP_SIZE]; /* GTPv2 RX stats */
+	gtp_stats_t		v2_tx[STATS_GTP_SIZE]; /* GTPv2 TX stats */
 
 	uint64_t		sessions_by_type[SESSIONTYPE_ENUM_SIZE];
 	uint64_t		sessions_by_rattype[RATTYPE_ENUM_SIZE];
@@ -83,10 +91,10 @@ typedef struct _gtp_ip_stats {
 
 typedef struct _gtp_plmn_stats {
 	/* gtp_stats_t SHALL be first */
-	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
-	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
-	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
-	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
+	gtp_stats_t		v1_rx[STATS_GTP_SIZE]; /* GTPv1 RX stats */
+	gtp_stats_t		v1_tx[STATS_GTP_SIZE]; /* GTPv1 TX stats */
+	gtp_stats_t		v2_rx[STATS_GTP_SIZE]; /* GTPv2 RX stats */
+	gtp_stats_t		v2_tx[STATS_GTP_SIZE]; /* GTPv2 TX stats */
 
 	uint64_t		sessions_by_type[SESSIONTYPE_ENUM_SIZE];
 	uint64_t		sessions_by_rattype[RATTYPE_ENUM_SIZE];
@@ -98,10 +106,10 @@ typedef struct _gtp_plmn_stats {
 
 typedef struct _gtp_signalling_gtp_stats {
 	/* gtp_stats_t SHALL be first */
-	gtp_stats_t		v1_rx[0xff]; /* GTPv1 RX stats */
-	gtp_stats_t		v1_tx[0xff]; /* GTPv1 TX stats */
-	gtp_stats_t		v2_rx[0xff]; /* GTPv2 RX stats */
-	gtp_stats_t		v2_tx[0xff]; /* GTPv2 TX stats */
+	gtp_stats_t		v1_rx[STATS_GTP_SIZE]; /* GTPv1 RX stats */
+	gtp_stats_t		v1_tx[STATS_GTP_SIZE]; /* GTPv1 TX stats */
+	gtp_stats_t		v2_rx[STATS_GTP_SIZE]; /* GTPv2 RX stats */
+	gtp_stats_t		v2_tx[STATS_GTP_SIZE]; /* GTPv2 TX stats */
 
 	uint64_t		sessions_by_type[SESSIONTYPE_ENUM_SIZE];
 	uint64_t		sessions_by_rattype[RATTYPE_ENUM_SIZE];
@@ -112,7 +120,7 @@ typedef struct _gtp_signalling_gtp_stats {
 
 typedef struct _gtp_pppoe_instance_stats {
 	gtp_stats_t		rx[0xff]; /* PPPoE RX stats */
-	gtp_stats_t		tx[0xff]; /* PPPoE RX stats */
+	gtp_stats_t		tx[0xff]; /* PPPoE TX stats */
 
 	char			*name;
 	struct hlist_node	hlist;
@@ -136,6 +144,10 @@ typedef struct _gtp_server_stats {
 
 
 /* Prototypes */
+
+extern int gtp_stats_init(gtp_server_stats_t*);
+extern int gtp_stats_destroy(gtp_server_stats_t*);
+
 
 extern int gtp_stats_vty_init(void);
 

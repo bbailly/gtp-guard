@@ -11,6 +11,93 @@
 /* local includes */
 #include "gtp_guard.h"
 
+int gtp_stats_init(gtp_server_stats_t *stats){
+	stats->signalling_gtp = MALLOC(sizeof(gtp_signalling_gtp_stats_t));
+	stats->signalling_pppoe = MALLOC(sizeof(gtp_signalling_pppoe_stats_t));
+	stats->signalling_gtp->plmns = MALLOC(sizeof(gtp_htab_t));
+	stats->signalling_pppoe->instances = MALLOC(sizeof(gtp_htab_t));
+	gtp_htab_init(stats->signalling_gtp->plmns, STATS_GTP_PLMN_HASHTAB_SIZE);
+	gtp_htab_init(stats->signalling_pppoe->instances, STATS_GTP_PPPOE_HASHTAB_SIZE);
+
+	return 0;
+}
+
+int gtp_stats_destroy(gtp_server_stats_t *stats){
+	gtp_plmn_stats_t *plmn_stats;
+	gtp_ip_stats_t *ip_stats;
+	struct hlist_node *n, *hl_tmp, *n1, *hl_tmp1;
+
+	for (int i = 0; i < STATS_GTP_PLMN_HASHTAB_SIZE; i++) {
+		hlist_for_each_entry_safe(plmn_stats, hl_tmp, n, &stats->signalling_gtp->plmns->htab[i], hlist){
+			if(plmn_stats->peers){
+				for (int j = 0; j < STATS_GTP_IP_HASHTAB_SIZE; j++) {
+					hlist_for_each_entry_safe(ip_stats, hl_tmp1, n1, &plmn_stats->peers->htab[j], hlist){
+						for (int k = 0; k < STATS_GTP_SIZE; k++) {
+							if(ip_stats->v1_rx[k].causes){
+								FREE(ip_stats->v1_rx[k].causes);
+							}
+							if(ip_stats->v1_tx[k].causes){
+								FREE(ip_stats->v1_tx[k].causes);
+							}
+							if(ip_stats->v2_rx[k].causes){
+								FREE(ip_stats->v2_rx[k].causes);
+							}
+							if(ip_stats->v2_tx[k].causes){
+								FREE(ip_stats->v2_tx[k].causes);
+							}
+						}
+						FREE(ip_stats->ip);
+						FREE(ip_stats);
+					}
+				}
+				gtp_htab_destroy(plmn_stats->peers);
+				FREE(plmn_stats->peers);
+			}
+			for (int k = 0; k < STATS_GTP_SIZE; k++) {
+				if(plmn_stats->v1_rx[k].causes){
+					FREE(plmn_stats->v1_rx[k].causes);
+				}
+				if(plmn_stats->v1_tx[k].causes){
+					FREE(plmn_stats->v1_tx[k].causes);
+				}
+				if(plmn_stats->v2_rx[k].causes){
+					FREE(plmn_stats->v2_rx[k].causes);
+				}
+				if(plmn_stats->v2_tx[k].causes){
+					FREE(plmn_stats->v2_tx[k].causes);
+				}
+			}
+			FREE(plmn_stats->plmn);
+			FREE(plmn_stats);
+		}
+	}
+	gtp_htab_destroy(stats->signalling_gtp->plmns);
+	FREE(stats->signalling_gtp->plmns);
+
+
+	for (int k = 0; k < STATS_GTP_SIZE; k++) {
+		if(stats->signalling_gtp->v1_rx[k].causes){
+			FREE(stats->signalling_gtp->v1_rx[k].causes);
+		}
+		if(stats->signalling_gtp->v1_tx[k].causes){
+			FREE(stats->signalling_gtp->v1_tx[k].causes);
+		}
+		if(stats->signalling_gtp->v2_rx[k].causes){
+			FREE(stats->signalling_gtp->v2_rx[k].causes);
+		}
+		if(stats->signalling_gtp->v2_tx[k].causes){
+			FREE(stats->signalling_gtp->v2_tx[k].causes);
+		}
+	}
+
+	gtp_htab_destroy(stats->signalling_pppoe->instances);
+	FREE(stats->signalling_pppoe->instances);
+	FREE(stats->signalling_pppoe);
+	FREE(stats->signalling_gtp);
+
+	return 0;
+}
+
 static struct hlist_head *
 gtp_stats_plmn_hashkey(gtp_htab_t *h, uint8_t *plmn)
 {
@@ -167,7 +254,7 @@ void __gtp_stats_gtp_inc_counter(gtp_gtp_stats_t *stats, uint8_t version, direct
 			stats->v1_rx[message_type].counter++;
 			if(cause){
 				if(!stats->v1_rx[message_type].causes){
-					stats->v1_rx[message_type].causes = MALLOC(sizeof(uint64_t[0xff]));
+					stats->v1_rx[message_type].causes = MALLOC(sizeof(uint64_t[STATS_GTP_SIZE]));
 				}
 				stats->v1_rx[message_type].causes[*cause]++;
 			}
@@ -175,7 +262,7 @@ void __gtp_stats_gtp_inc_counter(gtp_gtp_stats_t *stats, uint8_t version, direct
 			stats->v1_tx[message_type].counter++;
 			if(cause){
 				if(!stats->v1_tx[message_type].causes){
-					stats->v1_tx[message_type].causes = MALLOC(sizeof(uint64_t[0xff]));
+					stats->v1_tx[message_type].causes = MALLOC(sizeof(uint64_t[STATS_GTP_SIZE]));
 				}
 				stats->v1_tx[message_type].causes[*cause]++;
 			}
@@ -185,7 +272,7 @@ void __gtp_stats_gtp_inc_counter(gtp_gtp_stats_t *stats, uint8_t version, direct
 			stats->v2_rx[message_type].counter++;
 			if(cause){
 				if(!stats->v2_rx[message_type].causes){
-					stats->v2_rx[message_type].causes = MALLOC(sizeof(uint64_t[0xff]));
+					stats->v2_rx[message_type].causes = MALLOC(sizeof(uint64_t[STATS_GTP_SIZE]));
 				}
 				stats->v2_rx[message_type].causes[*cause]++;
 			}
@@ -193,7 +280,7 @@ void __gtp_stats_gtp_inc_counter(gtp_gtp_stats_t *stats, uint8_t version, direct
 			stats->v2_tx[message_type].counter++;
 			if(cause){
 				if(!stats->v2_tx[message_type].causes){
-					stats->v2_tx[message_type].causes = MALLOC(sizeof(uint64_t[0xff]));
+					stats->v2_tx[message_type].causes = MALLOC(sizeof(uint64_t[STATS_GTP_SIZE]));
 				}
 				stats->v2_tx[message_type].causes[*cause]++;
 			}
@@ -314,9 +401,9 @@ void __gtp_sum_stats(gtp_stats_t sum[], gtp_stats_t src[], uint8_t length){
 		sum[i].dropped += src[i].dropped;
 		if(src[i].causes){
 			if(!sum[i].causes){
-				sum[i].causes = MALLOC(sizeof(uint64_t[0xff]));
+				sum[i].causes = MALLOC(sizeof(uint64_t[STATS_GTP_SIZE]));
 			}
-			for(int j=0; j<0xff; j++){
+			for(int j=0; j<STATS_GTP_SIZE; j++){
 				sum[i].causes[j] = src[i].causes[j];
 			}
 		}
@@ -342,33 +429,33 @@ void __gtp_stats_show_gtp_server(gtp_server_t *srv, uint8_t *plmn, gtp_htab_t *t
 				if(memcmp(plmn_stats->plmn, plmn, GTP_PLMN_MAX_LEN)){
 					continue;
 				}
-				__gtp_sum_stats(stats_v1_rx, plmn_stats->v1_rx, 0xff);
-				__gtp_sum_stats(stats_v1_tx, plmn_stats->v1_tx, 0xff);
-				__gtp_sum_stats(stats_v2_rx, plmn_stats->v2_rx, 0xff);
-				__gtp_sum_stats(stats_v2_tx, plmn_stats->v2_tx, 0xff);
+				__gtp_sum_stats(stats_v1_rx, plmn_stats->v1_rx, STATS_GTP_SIZE);
+				__gtp_sum_stats(stats_v1_tx, plmn_stats->v1_tx, STATS_GTP_SIZE);
+				__gtp_sum_stats(stats_v2_rx, plmn_stats->v2_rx, STATS_GTP_SIZE);
+				__gtp_sum_stats(stats_v2_tx, plmn_stats->v2_tx, STATS_GTP_SIZE);
 
 				for (int i = 0; i < STATS_GTP_IP_HASHTAB_SIZE; i++) {
 					hlist_for_each_entry_safe(ip_stats, hl_tmp, n, &plmn_stats->peers->htab[i], hlist){
 						tmp_ip_stats = __gtp_stats_ip_hash(tmp_ips, ip_stats->ip);
-						__gtp_sum_stats(tmp_ip_stats->v1_rx, ip_stats->v1_rx, 0xff);
-						__gtp_sum_stats(tmp_ip_stats->v1_tx, ip_stats->v1_tx, 0xff);
-						__gtp_sum_stats(tmp_ip_stats->v2_rx, ip_stats->v2_rx, 0xff);
-						__gtp_sum_stats(tmp_ip_stats->v2_tx, ip_stats->v2_tx, 0xff);
+						__gtp_sum_stats(tmp_ip_stats->v1_rx, ip_stats->v1_rx, STATS_GTP_SIZE);
+						__gtp_sum_stats(tmp_ip_stats->v1_tx, ip_stats->v1_tx, STATS_GTP_SIZE);
+						__gtp_sum_stats(tmp_ip_stats->v2_rx, ip_stats->v2_rx, STATS_GTP_SIZE);
+						__gtp_sum_stats(tmp_ip_stats->v2_tx, ip_stats->v2_tx, STATS_GTP_SIZE);
 					}
 				}
 			}
 		}else{
-			__gtp_sum_stats(stats_v1_rx, worker->stats.signalling_gtp->v1_rx, 0xff);
-			__gtp_sum_stats(stats_v1_tx, worker->stats.signalling_gtp->v1_tx, 0xff);
-			__gtp_sum_stats(stats_v2_rx, worker->stats.signalling_gtp->v2_rx, 0xff);
-			__gtp_sum_stats(stats_v2_tx, worker->stats.signalling_gtp->v2_tx, 0xff);
+			__gtp_sum_stats(stats_v1_rx, worker->stats.signalling_gtp->v1_rx, STATS_GTP_SIZE);
+			__gtp_sum_stats(stats_v1_tx, worker->stats.signalling_gtp->v1_tx, STATS_GTP_SIZE);
+			__gtp_sum_stats(stats_v2_rx, worker->stats.signalling_gtp->v2_rx, STATS_GTP_SIZE);
+			__gtp_sum_stats(stats_v2_tx, worker->stats.signalling_gtp->v2_tx, STATS_GTP_SIZE);
 			for (int i = 0; i < STATS_GTP_PLMN_HASHTAB_SIZE; i++) {
 				hlist_for_each_entry_safe(plmn_stats, hl_tmp, n, &worker->stats.signalling_gtp->plmns->htab[i], hlist){
 					tmp_plmn_stats = __gtp_stats_plmn_hash(tmp_plmns, plmn_stats->plmn);
-					__gtp_sum_stats(tmp_plmn_stats->v1_rx, plmn_stats->v1_rx, 0xff);
-					__gtp_sum_stats(tmp_plmn_stats->v1_tx, plmn_stats->v1_tx, 0xff);
-					__gtp_sum_stats(tmp_plmn_stats->v2_rx, plmn_stats->v2_rx, 0xff);
-					__gtp_sum_stats(tmp_plmn_stats->v2_tx, plmn_stats->v2_tx, 0xff);
+					__gtp_sum_stats(tmp_plmn_stats->v1_rx, plmn_stats->v1_rx, STATS_GTP_SIZE);
+					__gtp_sum_stats(tmp_plmn_stats->v1_tx, plmn_stats->v1_tx, STATS_GTP_SIZE);
+					__gtp_sum_stats(tmp_plmn_stats->v2_rx, plmn_stats->v2_rx, STATS_GTP_SIZE);
+					__gtp_sum_stats(tmp_plmn_stats->v2_tx, plmn_stats->v2_tx, STATS_GTP_SIZE);
 				}
 			}
 		}
@@ -389,16 +476,16 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 	uint8_t unknown_plmn[GTP_PLMN_MAX_LEN] = {0};
 
 
-	gtp_stats_t stats_v1_rx[0xff] = {0};
-	gtp_stats_t stats_v1_tx[0xff] = {0};
-	gtp_stats_t stats_v2_rx[0xff] = {0};
-	gtp_stats_t stats_v2_tx[0xff] = {0};
+	gtp_stats_t stats_v1_rx[STATS_GTP_SIZE] = {0};
+	gtp_stats_t stats_v1_tx[STATS_GTP_SIZE] = {0};
+	gtp_stats_t stats_v2_rx[STATS_GTP_SIZE] = {0};
+	gtp_stats_t stats_v2_tx[STATS_GTP_SIZE] = {0};
 
 	if(plmn){
-		tmp_ips = MALLOC(sizeof(struct hlist_head));
+		tmp_ips = MALLOC(sizeof(gtp_htab_t));
 		gtp_htab_init(tmp_ips, STATS_GTP_IP_HASHTAB_SIZE);
 	}else{
-		tmp_plmns = MALLOC(sizeof(struct hlist_head));
+		tmp_plmns = MALLOC(sizeof(gtp_htab_t));
 		gtp_htab_init(tmp_plmns, STATS_GTP_PLMN_HASHTAB_SIZE);
 	}
 
@@ -409,19 +496,19 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 		}
 		if(plmn){
 			vty_out(vty, "\t\t\t\t\trx\ttx\tdrp%s", VTY_NEWLINE);
-			for(int j=0; j < 0xff; j++){
+			for(int j=0; j < STATS_GTP_SIZE; j++){
 				if(stats_v1_rx[j].counter > 0 || stats_v1_tx[j].counter > 0 || stats_v1_rx[j].dropped > 0){
 					vty_out(vty, "%-39.39s :\t%lu\t%lu\t%lu%s", gtp1c_msg_type2str[j].name, stats_v1_rx[j].counter, stats_v1_tx[j].counter, stats_v1_rx[j].dropped, VTY_NEWLINE);
-					for(int k=0; k < 0xff; k++){
+					for(int k=0; k < STATS_GTP_SIZE; k++){
 						if((stats_v1_rx[j].causes && stats_v1_rx[j].causes[k] > 0) || (stats_v1_tx[j].causes && stats_v1_tx[j].causes[k] > 0))
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu%s", gtp1c_msg_cause2str[k].name, stats_v1_rx[j].causes?stats_v1_rx[j].causes[k]:0, stats_v1_tx[j].causes?stats_v1_tx[j].causes[k]:0, VTY_NEWLINE);
 					}
 				}
 			}
-			for(int j=0; j < 0xff; j++){
+			for(int j=0; j < STATS_GTP_SIZE; j++){
 				if(stats_v2_rx[j].counter > 0 || stats_v2_tx[j].counter > 0 || stats_v2_rx[j].dropped > 0){
 					vty_out(vty, "%-37.37s :\t%lu\t%lu\t%lu%s", gtp2c_msg_type2str[j].name, stats_v2_rx[j].counter, stats_v2_tx[j].counter, stats_v2_rx[j].dropped, VTY_NEWLINE);
-					for(int k=0; k < 0xff; k++){
+					for(int k=0; k < STATS_GTP_SIZE; k++){
 						if((stats_v2_rx[j].causes && stats_v2_rx[j].causes[k] > 0) || (stats_v2_tx[j].causes && stats_v2_tx[j].causes[k] > 0))
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu%s", gtp2c_msg_cause2str[k].name, stats_v2_rx[j].causes?stats_v2_rx[j].causes[k]:0, stats_v2_tx[j].causes?stats_v2_tx[j].causes[k]:0, VTY_NEWLINE);
 					}
@@ -430,10 +517,10 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 			for (int i = 0; i < STATS_GTP_IP_HASHTAB_SIZE; i++) {
 				hlist_for_each_entry_safe(ip_stats, hl_tmp, n, &tmp_ips->htab[i], hlist){
 					vty_out(vty, "IP %u.%u.%u.%u%s", NIPQUAD(((struct sockaddr_in *)ip_stats->ip)->sin_addr), VTY_NEWLINE);
-					for(int j=0; j < 0xff; j++){
+					for(int j=0; j < STATS_GTP_SIZE; j++){
 						if(ip_stats->v1_rx[j].counter > 0 || ip_stats->v1_tx[j].counter > 0 || ip_stats->v1_rx[j].dropped > 0){
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu\t%lu%s", gtp1c_msg_type2str[j].name, ip_stats->v1_rx[j].counter, ip_stats->v1_tx[j].counter, ip_stats->v1_rx[j].dropped, VTY_NEWLINE);
-							for(int k=0; k < 0xff; k++){
+							for(int k=0; k < STATS_GTP_SIZE; k++){
 								if((ip_stats->v1_rx[j].causes && ip_stats->v1_rx[j].causes[k] > 0) || (ip_stats->v1_tx[j].causes && ip_stats->v1_tx[j].causes[k] > 0)){
 									if(gtp1c_msg_cause2str[k].name){
 										vty_out(vty, "  |_%-33.33s :\t%lu\t%lu%s", gtp1c_msg_cause2str[k].name, ip_stats->v1_rx[j].causes?ip_stats->v1_rx[j].causes[k]:0, ip_stats->v1_tx[j].causes?ip_stats->v1_tx[j].causes[k]:0, VTY_NEWLINE);
@@ -444,10 +531,10 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 							}
 						}
 					}
-					for(int j=0; j < 0xff; j++){
+					for(int j=0; j < STATS_GTP_SIZE; j++){
 						if(ip_stats->v2_rx[j].counter > 0 || ip_stats->v2_tx[j].counter > 0 || ip_stats->v2_rx[j].dropped > 0){
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu\t%lu%s", gtp2c_msg_type2str[j].name, ip_stats->v2_rx[j].counter, ip_stats->v2_tx[j].counter, ip_stats->v2_rx[j].dropped, VTY_NEWLINE);
-							for(int k=0; k < 0xff; k++){
+							for(int k=0; k < STATS_GTP_SIZE; k++){
 								if((ip_stats->v2_rx[j].causes && ip_stats->v2_rx[j].causes[k] > 0) || (ip_stats->v2_tx[j].causes && ip_stats->v2_tx[j].causes[k] > 0)){
 									if(gtp2c_msg_cause2str[k].name){
 										vty_out(vty, "  |_%-33.33s :\t%lu\t%lu%s", gtp2c_msg_cause2str[k].name, ip_stats->v2_rx[j].causes?ip_stats->v2_rx[j].causes[k]:0, ip_stats->v2_tx[j].causes?ip_stats->v2_tx[j].causes[k]:0, VTY_NEWLINE);
@@ -458,25 +545,35 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 							}
 						}
 					}
+					for (int k = 0; k < STATS_GTP_SIZE; k++) {
+						if(ip_stats->v1_rx[0].causes)
+							FREE(ip_stats->v1_rx[0].causes);
+						if(ip_stats->v1_tx[0].causes)
+							FREE(ip_stats->v1_tx[0].causes);
+						if(ip_stats->v2_rx[0].causes)
+							FREE(ip_stats->v1_rx[0].causes);
+						if(ip_stats->v2_tx[0].causes)
+							FREE(ip_stats->v2_tx[0].causes);
+					}
+					FREE(ip_stats->ip);
+					FREE(ip_stats);
 				}
 			}
-			gtp_htab_destroy(tmp_ips);
-			FREE(tmp_ips);
 		}else{
 			vty_out(vty, "\t\t\t\t\trx\ttx\tdrp%s", VTY_NEWLINE);
-			for(int j=0; j < 0xff; j++){
+			for(int j=0; j < STATS_GTP_SIZE; j++){
 				if(stats_v1_rx[j].counter > 0 || stats_v1_tx[j].counter > 0 || stats_v1_rx[j].dropped > 0){
 					vty_out(vty, "%-37.37s :\t%lu\t%lu\t%lu%s", gtp1c_msg_type2str[j].name, stats_v1_rx[j].counter, stats_v1_tx[j].counter, stats_v1_rx[j].dropped, VTY_NEWLINE);
-					for(int k=0; k < 0xff; k++){
+					for(int k=0; k < STATS_GTP_SIZE; k++){
 						if((stats_v1_rx[j].causes && stats_v1_rx[j].causes[k] > 0) || (stats_v1_tx[j].causes && stats_v1_tx[j].causes[k] > 0))
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu%s", gtp1c_msg_cause2str[k].name, stats_v1_rx[j].causes?stats_v1_rx[j].causes[k]:0, stats_v1_tx[j].causes?stats_v1_tx[j].causes[k]:0, VTY_NEWLINE);
 					}
 				}
 			}
-			for(int j=0; j < 0xff; j++){
+			for(int j=0; j < STATS_GTP_SIZE; j++){
 				if(stats_v2_rx[j].counter > 0 || stats_v2_tx[j].counter > 0 || stats_v2_rx[j].dropped > 0){
 					vty_out(vty, "%-37.37s :\t%lu\t%lu\t%lu%s", gtp2c_msg_type2str[j].name, stats_v2_rx[j].counter, stats_v2_tx[j].counter, stats_v2_rx[j].dropped, VTY_NEWLINE);
-					for(int k=0; k < 0xff; k++){
+					for(int k=0; k < STATS_GTP_SIZE; k++){
 						if((stats_v2_rx[j].causes && stats_v2_rx[j].causes[k] > 0) || (stats_v2_tx[j].causes && stats_v2_tx[j].causes[k] > 0))
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu%s", gtp2c_msg_cause2str[k].name, stats_v2_rx[j].causes?stats_v2_rx[j].causes[k]:0, stats_v2_tx[j].causes?stats_v2_tx[j].causes[k]:0, VTY_NEWLINE);
 					}
@@ -492,10 +589,10 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 						plmn_bcd_to_string(plmn_stats->plmn, splmn_s);
 						vty_out(vty, "PLMN %s%s", splmn_s, VTY_NEWLINE);
 					}
-					for(int j=0; j < 0xff; j++){
+					for(int j=0; j < STATS_GTP_SIZE; j++){
 						if(plmn_stats->v1_rx[j].counter > 0 || plmn_stats->v1_tx[j].counter > 0 || plmn_stats->v1_rx[j].dropped > 0){
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu\t%lu%s", gtp1c_msg_type2str[j].name, plmn_stats->v1_rx[j].counter, plmn_stats->v1_tx[j].counter, plmn_stats->v1_rx[j].dropped, VTY_NEWLINE);
-							for(int k=0; k < 0xff; k++){
+							for(int k=0; k < STATS_GTP_SIZE; k++){
 								if((plmn_stats->v1_rx[j].causes && plmn_stats->v1_rx[j].causes[k] > 0) || (plmn_stats->v1_tx[j].causes && plmn_stats->v1_tx[j].causes[k] > 0)){
 									if(gtp1c_msg_cause2str[k].name){
 										vty_out(vty, "  |_%-33.33s :\t%lu\t%lu%s", gtp1c_msg_cause2str[k].name, plmn_stats->v1_rx[j].causes?plmn_stats->v1_rx[j].causes[k]:0, plmn_stats->v1_tx[j].causes?plmn_stats->v1_tx[j].causes[k]:0, VTY_NEWLINE);
@@ -506,10 +603,10 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 							}
 						}
 					}
-					for(int j=0; j < 0xff; j++){
+					for(int j=0; j < STATS_GTP_SIZE; j++){
 						if(plmn_stats->v2_rx[j].counter > 0 || plmn_stats->v2_tx[j].counter > 0 || plmn_stats->v2_rx[j].dropped > 0){
 							vty_out(vty, "|_%-35.35s :\t%lu\t%lu\t%lu%s", gtp2c_msg_type2str[j].name, plmn_stats->v2_rx[j].counter, plmn_stats->v2_tx[j].counter, plmn_stats->v2_rx[j].dropped, VTY_NEWLINE);
-							for(int k=0; k < 0xff; k++){
+							for(int k=0; k < STATS_GTP_SIZE; k++){
 								if((plmn_stats->v2_rx[j].causes && plmn_stats->v2_rx[j].causes[k] > 0) || (plmn_stats->v2_tx[j].causes && plmn_stats->v2_tx[j].causes[k] > 0)){
 									if(gtp2c_msg_cause2str[k].name){
 										vty_out(vty, "  |_%-33.33s :\t%lu\t%lu%s", gtp2c_msg_cause2str[k].name, plmn_stats->v2_rx[j].causes?plmn_stats->v2_rx[j].causes[k]:0, plmn_stats->v2_tx[j].causes?plmn_stats->v2_tx[j].causes[k]:0, VTY_NEWLINE);
@@ -520,13 +617,35 @@ gtp_stats_gtp_show(vty_t *vty, uint8_t *plmn)
 							}
 						}
 					}
+					for (int k = 0; k < STATS_GTP_SIZE; k++) {
+						if(plmn_stats->v1_rx[0].causes)
+							FREE(plmn_stats->v1_rx[0].causes);
+						if(plmn_stats->v1_tx[0].causes)
+							FREE(plmn_stats->v1_tx[0].causes);
+						if(plmn_stats->v2_rx[0].causes)
+							FREE(plmn_stats->v2_rx[0].causes);
+						if(plmn_stats->v2_tx[0].causes)
+							FREE(plmn_stats->v2_tx[0].causes);
+					}
+					gtp_htab_destroy(plmn_stats->peers);
+					FREE(plmn_stats->peers);
+					FREE(plmn_stats->plmn);
+					FREE(plmn_stats);
 				}
 			}
-			gtp_htab_destroy(tmp_plmns);
-			FREE(tmp_plmns);
 		}
 	}
-	for(int j=0; j < 0xff; j++){
+
+	if(plmn){
+		gtp_htab_destroy(tmp_ips);
+		FREE(tmp_ips);
+	}else{
+		gtp_htab_destroy(tmp_plmns);
+		FREE(tmp_plmns);
+	}
+
+
+	for(int j=0; j < STATS_GTP_SIZE; j++){
 		if(stats_v1_rx[j].causes){
 			FREE(stats_v1_rx[j].causes);
 		}
