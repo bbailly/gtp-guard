@@ -87,12 +87,13 @@ tarball: clean
 	@echo $(TARBALL)
 
 package: all
-	@rm -rf *.deb
+	@rm -rf $(EXEC)_$(VERSION)_$(ARCH).deb
 	@rm -rf $(PKG_DIR)/*
 	@mkdir -p $(PKG_DIR)/DEBIAN
 	@echo "Package: $(EXEC)" > $(PKG_DIR)/DEBIAN/control
 	@echo "Version: $(VERSION)" >> $(PKG_DIR)/DEBIAN/control
 	@echo "Architecture: $(ARCH)" >> $(PKG_DIR)/DEBIAN/control
+	@echo "Depends: libelf1" >> $(PKG_DIR)/DEBIAN/control
 	@echo "Maintainer: $(MAINTAINER)" >> $(PKG_DIR)/DEBIAN/control
 	@echo "Description: $(DESCRIPTION)" >> $(PKG_DIR)/DEBIAN/control
 	@echo "/$(debian_conf_dir)/$(debian_conf_file)" > $(PKG_DIR)/DEBIAN/conffiles
