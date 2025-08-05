@@ -21,16 +21,25 @@
 
 EXEC = gtp-guard
 BIN  = bin
+SERVICE = service
+CONF = conf
 VERSION := $(shell cat VERSION)
+ARCH := $(shell dpkg --print-architecture)
+MAINTAINER := $(shell head -n1 AUTHOR)
+DESCRIPTION := $(shell head -n1 README.md | sed 's/^# *//')
 TARBALL = $(EXEC)-$(VERSION).tar.xz
 TARFILES = AUTHOR VERSION LICENSE README.md bin src lib Makefile libbpf
+PKG_DIR = packaging
 
 prefix ?= /usr/local
 exec_prefix ?= ${prefix}
 sbindir     ?= ${exec_prefix}/sbin
 sysconfdir  ?= ${prefix}/etc
 init_script = etc/init.d/gtp-guard.init
-conf_file   = etc/gtp-guard/gtp-guard.conf
+debian_bin_dir = usr/sbin
+debian_conf_dir = etc/gtp-guard
+debian_conf_file = gtp-guard.conf
+debian_service_dir = etc/systemd/system/multi-user.target.wants
 
 CC        ?= gcc
 LDFLAGS   = -lpthread -lcrypt -ggdb -lm -lz -lresolv -lelf
@@ -76,3 +85,21 @@ tarball: clean
 	@tar -cJf $(TARBALL) $(EXEC)-$(VERSION)
 	@rm -rf $(EXEC)-$(VERSION)
 	@echo $(TARBALL)
+
+package: all
+	@rm -rf *.deb
+	@rm -rf $(PKG_DIR)/*
+	@mkdir -p $(PKG_DIR)/DEBIAN
+	@echo "Package: $(EXEC)" > $(PKG_DIR)/DEBIAN/control
+	@echo "Version: $(VERSION)" >> $(PKG_DIR)/DEBIAN/control
+	@echo "Architecture: $(ARCH)" >> $(PKG_DIR)/DEBIAN/control
+	@echo "Maintainer: $(MAINTAINER)" >> $(PKG_DIR)/DEBIAN/control
+	@echo "Description: $(DESCRIPTION)" >> $(PKG_DIR)/DEBIAN/control
+	@echo "/$(debian_conf_dir)/$(debian_conf_file)" > $(PKG_DIR)/DEBIAN/conffiles
+	@mkdir -p $(PKG_DIR)/$(debian_bin_dir) $(PKG_DIR)/$(debian_conf_dir) $(PKG_DIR)/$(debian_service_dir)
+	@cp $(BIN)/$(EXEC) $(PKG_DIR)/$(debian_bin_dir)/$(EXEC)-$(VERSION)
+	@rm -f $(PKG_DIR)/$(debian_bin_dir)/$(EXEC)
+	@ln -s $(EXEC)-$(VERSION) $(PKG_DIR)/$(debian_bin_dir)/$(EXEC)
+	@cp $(CONF)/$(debian_conf_file) $(PKG_DIR)/$(debian_conf_dir)/
+	@cp $(SERVICE)/*.service $(PKG_DIR)/$(debian_service_dir)/
+	dpkg-deb --build $(PKG_DIR) $(EXEC)_$(VERSION)_$(ARCH).deb
