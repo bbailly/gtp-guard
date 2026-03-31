@@ -84,6 +84,7 @@ struct inet_worker {
 struct inet_server {
 	struct sockaddr_storage	addr;
 	int			type;		/* SOCK_DGRAM or SOCK_STREAM */
+	const char *		vrf;
 
 	/* async I/O MUX related */
 	int			fd;
@@ -124,7 +125,7 @@ ssize_t inet_server_snd(struct inet_server *s, int fd, struct pkt_buffer *pbuff,
 			struct sockaddr_in *addr);
 ssize_t inet_http_read(struct inet_cnx *c);
 int inet_server_start(struct inet_server *s, struct thread_master *m);
-int inet_server_init(struct inet_server *s, int type);
+int inet_server_init(struct inet_server *s, int type, const char *vrf);
 int inet_server_destroy(struct inet_server *s);
 int inet_server_for_each_worker(struct inet_server *s,
 				int (*cb) (struct inet_worker *, void *),

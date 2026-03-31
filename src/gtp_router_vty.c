@@ -152,7 +152,7 @@ DEFUN(gtpc_router_tunnel_endpoint,
 	}
 
 	__set_bit(GTP_FL_CTL_BIT, &srv->flags);
-	err = gtp_server_init(srv, ctx, gtp_router_ingress_init, gtp_router_ingress_process);
+	err = gtp_server_init(srv, ctx, gtp_router_ingress_init, gtp_router_ingress_process, NULL);
 	if (err) {
 		vty_out(vty, "%% Error initializing GTP-C listener on [%s]:%d%s"
 			   , argv[0], port, VTY_NEWLINE);
@@ -196,7 +196,7 @@ DEFUN(gtpu_router_tunnel_endpoint,
 		return CMD_WARNING;
 	}
 
-	err = gtp_server_init(srv, ctx, gtp_router_ingress_init, gtp_router_ingress_process);
+	err = gtp_server_init(srv, ctx, gtp_router_ingress_init, gtp_router_ingress_process, NULL);
 	if (err) {
 		vty_out(vty, "%% Error initializing GTP-U listener on [%s]:%d%s"
 			   , argv[0], port, VTY_NEWLINE);

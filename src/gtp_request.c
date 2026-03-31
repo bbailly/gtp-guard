@@ -156,7 +156,7 @@ gtp_request_init(void)
 	s->cnx_rcv = &inet_http_read;
 	s->cnx_process = &gtp_request_cnx_process;
 
-	inet_server_init(s, SOCK_STREAM);
+	inet_server_init(s, SOCK_STREAM, NULL);
 	return inet_server_start(s, NULL);
 }
 

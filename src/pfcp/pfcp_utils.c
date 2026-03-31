@@ -245,7 +245,11 @@ pfcp_3GPP_interface2str(int type)
 	case PFCP_3GPP_INTERFACE_S8U:
 		return "S8-U";
 	case PFCP_3GPP_INTERFACE_N9:
-		return "N9-U";
+		return "N9";
+	case PFCP_3GPP_INTERFACE_N3:
+		return "N3";
+	case PFCP_3GPP_INTERFACE_N6:
+		return "N6";
 	}
 
 	return "unknown";

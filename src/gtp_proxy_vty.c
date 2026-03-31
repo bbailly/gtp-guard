@@ -185,7 +185,7 @@ DEFUN(gtpc_proxy_tunnel_endpoint,
 
 	__set_bit(GTP_FL_CTL_BIT, &srv->flags);
 	__set_bit(GTP_FL_GTPC_INGRESS_BIT, &srv->flags);
-	err = gtp_server_init(srv, ctx, gtp_proxy_ingress_init, gtp_proxy_ingress_process);
+	err = gtp_server_init(srv, ctx, gtp_proxy_ingress_init, gtp_proxy_ingress_process, NULL);
 	if (err) {
 		vty_out(vty, "%% Error initializing Ingress GTP-C Proxy listener on [%s]:%d%s"
 			   , argv[0], port, VTY_NEWLINE);
@@ -231,7 +231,7 @@ DEFUN(gtpc_proxy_egress_tunnel_endpoint,
 
 	__set_bit(GTP_FL_CTL_BIT, &srv->flags);
 	__set_bit(GTP_FL_GTPC_EGRESS_BIT, &srv->flags);
-	err = gtp_server_init(srv, ctx, gtp_proxy_ingress_init, gtp_proxy_ingress_process);
+	err = gtp_server_init(srv, ctx, gtp_proxy_ingress_init, gtp_proxy_ingress_process, NULL);
 	if (err) {
 		vty_out(vty, "%% Error initializing Egress GTP-C Proxy listener on [%s]:%d%s"
 			   , argv[0], port, VTY_NEWLINE);
@@ -328,7 +328,7 @@ DEFUN(gtpu_proxy_tunnel_endpoint,
 		__set_bit(GTP_FL_GTPU_INGRESS_BIT, &srv->flags);
 	if (egress)
 		__set_bit(GTP_FL_GTPU_EGRESS_BIT, &srv->flags);
-	err = gtp_server_init(srv, ctx, gtp_proxy_ingress_init, gtp_proxy_ingress_process);
+	err = gtp_server_init(srv, ctx, gtp_proxy_ingress_init, gtp_proxy_ingress_process, NULL);
 	if (err) {
 		vty_out(vty, "%% Error initializing %s GTP-U Proxy listener on %s\n",
 			argv[1], addr_stringify(&bind_addr, buf, sizeof (buf)));

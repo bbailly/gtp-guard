@@ -54,6 +54,10 @@ enum pfcp_interface {
 	PFCP_IF_S5_U,
 	PFCP_IF_S8_U,
 	PFCP_IF_SGI,
+	PFCP_IF_N3,
+	PFCP_IF_N6,
+	PFCP_IF_N9,
+
 	PFCP_IF_MAX,
 };
 

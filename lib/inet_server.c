@@ -88,7 +88,7 @@ inet_server_rcv(struct inet_server *s, struct sockaddr *addr, socklen_t *addrlen
  *	Inet Server UDP
  */
 int
-inet_server_udp_init(struct sockaddr_storage *addr)
+inet_server_udp_init(struct sockaddr_storage *addr, const char *vrf)
 {
 	socklen_t addrlen;
 	int fd, err;
@@ -99,6 +99,18 @@ inet_server_udp_init(struct sockaddr_storage *addr)
 	err = (err) ? : inet_setsockopt_reuseport(fd, 1);
 	err = (err) ? : inet_setsockopt_rcvbuf(fd, INET_SOCKBUF_SIZE);
 	err = (err) ? : inet_setsockopt_sndbuf(fd, INET_SOCKBUF_SIZE);
+	if(vrf){
+		err = (err) ? : inet_setsockopt_bindtodevice(fd, vrf);
+		if (err) {
+			log_message(LOG_INFO, "%s(): error creating UDP [%s]:%d socket on vrf %s"
+					, __FUNCTION__
+					, inet_sockaddrtos(addr)
+					, ntohs(inet_sockaddrport(addr))
+					, vrf);
+			close(fd);
+			return -1;
+		}
+	}
 	if (err) {
 		log_message(LOG_INFO, "%s(): error creating UDP [%s]:%d socket"
 				    , __FUNCTION__
@@ -146,7 +158,7 @@ inet_server_udp_async_recv_thread(struct thread *t)
 		/* re-init on error */
 		thread_del(t);
 		close(s->fd);
-		s->fd = inet_server_udp_init(&s->addr);
+		s->fd = inet_server_udp_init(&s->addr, s->vrf);
 		if (s->fd < 0) {
 			log_message(LOG_INFO, "%s(): Error creating UDP on [%s]:%d...dying..."
 					    , __FUNCTION__
@@ -609,7 +621,7 @@ inet_server_start(struct inet_server *s, struct thread_master *m)
 }
 
 int
-inet_server_init(struct inet_server *s, int type)
+inet_server_init(struct inet_server *s, int type, char const *vrf)
 {
 	int i, fd, err;
 
@@ -622,7 +634,7 @@ inet_server_init(struct inet_server *s, int type)
 
 	switch (type) {
 	case SOCK_DGRAM:
-		fd = inet_server_udp_init(&s->addr);
+		fd = inet_server_udp_init(&s->addr, vrf);
 		if (fd < 0)
 			return -1;
 		s->fd  = fd;

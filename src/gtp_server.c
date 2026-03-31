@@ -64,7 +64,7 @@ gtp_server_rcv(struct inet_server *srv, ssize_t nbytes)
 int
 gtp_server_init(struct gtp_server *s, void *ctx,
 		int (*init) (struct inet_server *),
-		int (*process) (struct inet_server *, struct sockaddr_storage *))
+		int (*process) (struct inet_server *, struct sockaddr_storage *), const char *vrf)
 {
 	struct inet_server *srv = &s->s;
 	struct sockaddr_storage *addr = &srv->addr;
@@ -77,14 +77,16 @@ gtp_server_init(struct gtp_server *s, void *ctx,
 	srv->process = process;
 	srv->snd = gtp_server_snd;
 	srv->rcv = gtp_server_rcv;
+	srv->vrf = vrf;
 
 	/* Create UDP Listener */
-	err = inet_server_init(&s->s, SOCK_DGRAM);
+	err = inet_server_init(&s->s, SOCK_DGRAM, vrf);
 	if (err) {
-		log_message(LOG_INFO, "%s(): Error creating GTP on [%s]:%d"
+		log_message(LOG_INFO, "%s(): Error creating GTP on [%s]:%d (vrf %s)"
 				    , __FUNCTION__
 				    , inet_sockaddrtos(addr)
-				    , ntohs(inet_sockaddrport(addr)));
+				    , ntohs(inet_sockaddrport(addr))
+				    , vrf?vrf:"NA");
 		return -1;
 	}
 
